@@ -1,3 +1,6 @@
+#include <iostream>
+#include <string>
+
 // Generally always include these
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
@@ -23,6 +26,7 @@
 int main(int argc, char* argv[])
 {
   // Verify input arguments
+  /*
   if (argc < 3)
   {
     std::cout << "Usage: " << argv[0]
@@ -30,58 +34,57 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
   }
 
-  std::cout << argv[1] << " " << argv[2];
-
-  // Read in two PNG images (maybe doesn't have to be done for ARFI images).
-  vtkSmartPointer<vtkJPEGReader> reader =	
-    vtkSmartPointer<vtkJPEGReader>::New();
-  reader->SetFileName(argv[1]);
-
-  vtkSmartPointer<vtkJPEGReader> reader2 =	
-    vtkSmartPointer<vtkJPEGReader>::New();
-  reader2->SetFileName(argv[2]);
-
-  // Convert the PNG image to polydata
-  vtkSmartPointer<vtkImageDataGeometryFilter> imageDataGeometryFilter = 
-    vtkSmartPointer<vtkImageDataGeometryFilter>::New();
-  imageDataGeometryFilter->SetInputConnection(reader->GetOutputPort());
-  imageDataGeometryFilter->Update();
-
-  vtkSmartPointer<vtkImageDataGeometryFilter> imageDataGeometryFilter2 = 
-    vtkSmartPointer<vtkImageDataGeometryFilter>::New();
-  imageDataGeometryFilter2->SetInputConnection(reader2->GetOutputPort());
-  imageDataGeometryFilter2->Update();
-
-  // Rotate the second image by 45 degrees.
-  vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
-  //transform->RotateWXYZ(double angle, double x, double y, double z);
-  transform->RotateWXYZ(45, 0, 1, 0);
-  vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = 
-      vtkSmartPointer<vtkTransformPolyDataFilter>::New();
-  transformFilter->SetTransform(transform);
-  transformFilter->SetInputConnection(imageDataGeometryFilter2->GetOutputPort());
-  transformFilter->Update();
-
-  //Append the two meshes 
-  vtkSmartPointer<vtkPolyData> input1 =
-    vtkSmartPointer<vtkPolyData>::New();
-  input1->ShallowCopy(imageDataGeometryFilter->GetOutput());
-
-  vtkSmartPointer<vtkPolyData> input2 =
-    vtkSmartPointer<vtkPolyData>::New();
-  input2->ShallowCopy(transformFilter->GetOutput());
+  std::cout << argv[1] << " " << argv[2] << " " << argc;
+  // std::cout << 
+  */
+  vtkSmartPointer<vtkJPEGReader> reader;
+  vtkSmartPointer<vtkImageDataGeometryFilter> imageDataGeometryFilter;
+  vtkSmartPointer<vtkTransform> rotationTransform;
+  vtkSmartPointer<vtkTransformPolyDataFilter> rotationTransformFilter;
+  vtkSmartPointer<vtkPolyData> myImageData;
 
   vtkSmartPointer<vtkAppendPolyData> appendFilter =
     vtkSmartPointer<vtkAppendPolyData>::New();
-  #if VTK_MAJOR_VERSION <= 5
-    appendFilter->AddInputConnection(input1->GetProducerPort());
-    appendFilter->AddInputConnection(input2->GetProducerPort());
-  #else
-    appendFilter->AddInputData(input1);
-    appendFilter->AddInputData(input2);
-  #endif
-  appendFilter->Update();
-  
+
+  double angle = 0;
+
+  for (std::string line; std::getline(std::cin, line);) {
+    std::cout << line << std::endl;
+
+	// Read in image data.
+	reader = vtkSmartPointer<vtkJPEGReader>::New();
+    reader->SetFileName(line.c_str());
+
+	// Convert image data to PolyData
+	imageDataGeometryFilter = vtkSmartPointer<vtkImageDataGeometryFilter>::New();
+    imageDataGeometryFilter->SetInputConnection(reader->GetOutputPort());
+    imageDataGeometryFilter->Update();
+
+	// Rotate the image.
+	//transform->RotateWXYZ(double angle, double x, double y, double z);
+	rotationTransform = vtkSmartPointer<vtkTransform>::New();
+	rotationTransform->RotateWXYZ(angle, 0, 1, 0);
+
+	rotationTransformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+	rotationTransformFilter->SetTransform(rotationTransform);
+	rotationTransformFilter->SetInputConnection(imageDataGeometryFilter->GetOutputPort());
+	rotationTransformFilter->Update();
+
+	myImageData = vtkSmartPointer<vtkPolyData>::New();
+	myImageData->ShallowCopy(rotationTransformFilter->GetOutput());
+
+	#if VTK_MAJOR_VERSION <= 5
+	  appendFilter->AddInputConnection(myImageData->GetProducerPort());
+    #else
+	  appendFilter->AddInputData(myImageData);
+    #endif
+	appendFilter->Update();
+
+	angle += 20;
+  }
+
+  //return EXIT_SUCCESS;
+
   // Remove any duplicate points.
   vtkSmartPointer<vtkCleanPolyData> cleanFilter =
     vtkSmartPointer<vtkCleanPolyData>::New();
