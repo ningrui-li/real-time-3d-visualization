@@ -27,16 +27,14 @@ int main(int argc, char* argv[])
 {
   // Verify input arguments
   /*
-  if (argc < 3)
+  if (argc < 2)
   {
     std::cout << "Usage: " << argv[0]
               << " IMAGE_ONE(.png) IMAGE_TWO(.png)" << std::endl;
     return EXIT_FAILURE;
   }
-
-  std::cout << argv[1] << " " << argv[2] << " " << argc;
-  // std::cout << 
   */
+
   vtkSmartPointer<vtkJPEGReader> reader;
   vtkSmartPointer<vtkImageDataGeometryFilter> imageDataGeometryFilter;
   vtkSmartPointer<vtkTransform> rotationTransform;
@@ -48,6 +46,7 @@ int main(int argc, char* argv[])
 
   double angle = 0;
 
+  // Read in images and append them to a single PolyData
   for (std::string line; std::getline(std::cin, line);) {
     std::cout << line << std::endl;
 
@@ -73,6 +72,7 @@ int main(int argc, char* argv[])
 	myImageData = vtkSmartPointer<vtkPolyData>::New();
 	myImageData->ShallowCopy(rotationTransformFilter->GetOutput());
 
+	// Append image to the rest of the read images.
 	#if VTK_MAJOR_VERSION <= 5
 	  appendFilter->AddInputConnection(myImageData->GetProducerPort());
     #else
@@ -80,10 +80,9 @@ int main(int argc, char* argv[])
     #endif
 	appendFilter->Update();
 
+	// Update angle offset between each image.
 	angle += 20;
   }
-
-  //return EXIT_SUCCESS;
 
   // Remove any duplicate points.
   vtkSmartPointer<vtkCleanPolyData> cleanFilter =
