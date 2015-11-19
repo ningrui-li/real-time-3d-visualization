@@ -12,3 +12,9 @@
 4. Build the project.
 
     `make`
+
+5. Test that the script works by inputting image names through standard input (stdin).
+
+    `cd ..`
+    
+    `ls -d images/JPG/dog-* | ./build/ARFIVisualization `
