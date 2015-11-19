@@ -6,7 +6,7 @@
 
 // For reading in images
 #include <vtkSmartPointer.h>
-#include <vtkPNGReader.h>
+#include <vtkJPEGReader.h>
 
 #include <vtkImageDataGeometryFilter.h>
 
@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
   // Verify input arguments
   if (argc < 3)
   {
-    std::cout << "Usage: ./PNGReader.exe"
+    std::cout << "Usage: " << argv[0]
               << " IMAGE_ONE(.png) IMAGE_TWO(.png)" << std::endl;
     return EXIT_FAILURE;
   }
@@ -33,12 +33,12 @@ int main(int argc, char* argv[])
   std::cout << argv[1] << " " << argv[2];
 
   // Read in two PNG images (maybe doesn't have to be done for ARFI images).
-  vtkSmartPointer<vtkPNGReader> reader =	
-    vtkSmartPointer<vtkPNGReader>::New();
+  vtkSmartPointer<vtkJPEGReader> reader =	
+    vtkSmartPointer<vtkJPEGReader>::New();
   reader->SetFileName(argv[1]);
 
-  vtkSmartPointer<vtkPNGReader> reader2 =	
-    vtkSmartPointer<vtkPNGReader>::New();
+  vtkSmartPointer<vtkJPEGReader> reader2 =	
+    vtkSmartPointer<vtkJPEGReader>::New();
   reader2->SetFileName(argv[2]);
 
   // Convert the PNG image to polydata
