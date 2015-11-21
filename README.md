@@ -1,9 +1,12 @@
-# Real-Time ARFI Image Visualization using VTK
+Real-Time ARFI Image Visualization using VTK
+============================================
 
-## Setup
+Setup
+-----
+
 1. [Install CMake and build the VTK Libraries.](http://www.vtk.org/Wiki/VTK/Configure_and_Build)
 
-Some random notes on building this on Windows 10 with Qt 5.2.1 (OpenGL):
+ Some random notes on building this on Windows 10 with Qt 5.2.1 (OpenGL):
 
  * The Qt version will default to 4; you need to manually change this to 5 (if you choose to use 5).
 
@@ -14,7 +17,7 @@ Some random notes on building this on Windows 10 with Qt 5.2.1 (OpenGL):
   on my system.  This was non-obvious since the wiki page points you to a path in the Qt 
   install.
       
-This build worked "out of the box" on Fedora 23 with the system-wide VTK developer tools installed.
+ This build worked "out of the box" on Fedora 23 with the system-wide VTK developer tools installed.
 
 2. Create a new directory named `build` and change to that directory.
 
