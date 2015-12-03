@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
   camera->SetViewUp(.3, .8, .3);
   ren->SetActiveCamera(camera);
  
-  renWin->Render();
+  renWin->SetSize(1280, 720);
 
   renderWindowInteractor->Initialize();
   renWin->Render();  
