@@ -6,6 +6,8 @@
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkProperty.h>
 
 // For reading in images
 #include <vtkSmartPointer.h>
@@ -20,8 +22,11 @@
 
 #include <vtkCleanPolyData.h>
 #include <vtkAppendPolyData.h>
-//#include <vtkUnstructuredGrid.h>
-#include <vtkDataSetMapper.h>
+
+// Plane widget interactor
+#include <vtkImagePlaneWidget.h>
+#include <vtkInteractorStyleTrackballActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
 
 int main(int argc, char* argv[])
 {
@@ -62,7 +67,7 @@ int main(int argc, char* argv[])
 	// Rotate the image.
 	//transform->RotateWXYZ(double angle, double x, double y, double z);
 	rotationTransform = vtkSmartPointer<vtkTransform>::New();
-	rotationTransform->RotateWXYZ(angle, 0, 1, 0);
+	rotationTransform->RotateWXYZ(angle, 1, 0, 0);
 
 	rotationTransformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
 	rotationTransformFilter->SetTransform(rotationTransform);
@@ -81,45 +86,83 @@ int main(int argc, char* argv[])
 	appendFilter->Update();
 
 	// Update angle offset between each image.
-	angle += 20;
+	angle += 5;
   }
 
   // Remove any duplicate points.
   vtkSmartPointer<vtkCleanPolyData> cleanFilter =
     vtkSmartPointer<vtkCleanPolyData>::New();
   cleanFilter->SetInputConnection(appendFilter->GetOutputPort());
+  //cleanFilter->SetTolerance(0.1);
   cleanFilter->Update();
 
-  // Create a mapper and actor
-  vtkSmartPointer<vtkPolyDataMapper> mapper = 
+  // Visualization
+  vtkSmartPointer<vtkPolyDataMapper> map = 
     vtkSmartPointer<vtkPolyDataMapper>::New();
-  mapper->SetInputConnection(cleanFilter->GetOutputPort());
-
-  vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-  actor->SetMapper(mapper);
-
-  // Rotate actor
-  // actor->RotateY(45);
-
-   // Visualization
-  vtkSmartPointer<vtkRenderer> renderer = 
+  map->SetInputConnection(cleanFilter->GetOutputPort());
+  //map->ScalarVisibilityOff();
+ 
+  vtkSmartPointer<vtkActor> surfaceActor = 
+    vtkSmartPointer<vtkActor>::New();
+  surfaceActor->SetMapper(map);
+ 
+  // Create the renderer
+  vtkSmartPointer<vtkRenderer> ren = 
     vtkSmartPointer<vtkRenderer>::New();
 
-  vtkSmartPointer<vtkRenderWindow> renderWindow = 
+  // Add the actors to the renderer, set the background and size
+  ren->AddActor(surfaceActor);
+  ren->SetBackground(.2, .3, .4);
+  
+  // Create renderer window.
+  vtkSmartPointer<vtkRenderWindow> renWin = 
     vtkSmartPointer<vtkRenderWindow>::New();
-  renderWindow->AddRenderer(renderer);
+  renWin->AddRenderer(ren);
 
+  // Create renderer window interactor and set interactor style.
   vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = 
     vtkSmartPointer<vtkRenderWindowInteractor>::New();
-  renderWindowInteractor->SetRenderWindow(renderWindow);
- 
-  renderer->AddActor(actor);
-  renderer->SetBackground(1, 1, 1); // Background color white
- 
-  renderWindow->Render();
+  renderWindowInteractor->SetRenderWindow(renWin);
 
-  // Start interactive window.
-  renderWindowInteractor->Start();
+  vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = 
+    vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
+  renderWindowInteractor->SetInteractorStyle(style);
+
+  // Create plane widget and initialize position of widget.
+  vtkSmartPointer<vtkImagePlaneWidget> planeWidget = 
+    vtkSmartPointer<vtkImagePlaneWidget>::New();
+  planeWidget->SetInteractor(renderWindowInteractor);
+
+  // Adjust initial camera position
+  vtkSmartPointer<vtkCamera> camera = 
+    vtkSmartPointer<vtkCamera>::New();
+  camera->SetPosition(1000, 500, 500);
+  camera->SetFocalPoint(0, 0, 0);
+  camera->SetViewUp(.3, .8, .3);
+  ren->SetActiveCamera(camera);
  
+  renWin->Render();
+
+  renderWindowInteractor->Initialize();
+  renWin->Render();  
+
+  double* firstPoint = planeWidget->GetPoint1();
+  double* secondPoint = planeWidget->GetPoint2();
+
+  std::cout << "First Point: " << firstPoint[0] << " " << firstPoint[1] 
+            << " " << firstPoint[2] << std::endl;
+  std::cout << "Second Point: " << secondPoint[0] << " " << secondPoint[1] 
+            << " " << secondPoint[2] << std::endl;
+
+
+  planeWidget->SetPoint1(200, 0, 0);
+  planeWidget->SetPoint2(0, 300, 0);
+  planeWidget->UpdatePlacement();
+  planeWidget->On();
+  // Begin mouse interaction
+  renderWindowInteractor->Start();
+
+
+
   return EXIT_SUCCESS;
 }
