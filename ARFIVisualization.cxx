@@ -29,6 +29,20 @@
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkObjectFactory.h>
 
+#include <vtkImageData.h>
+#include <vtkImageMapper.h>
+#include <vtkActor2D.h>
+#include <vtkImageSlice.h>
+#include <vtkInteractorStyleImage.h>
+#include <vtkJPEGWriter.h>
+#include <vtkSmartPointer.h>
+
+
+#include <vtkPolyDataToImageStencil.h>
+#include <vtkImageStencil.h>
+#include <vtkPointData.h>
+vtkSmartPointer<vtkImagePlaneWidget> planeWidget;
+
 // Define interaction style
 class KeyPressInteractorStyle : public vtkInteractorStyleTrackballCamera
 {
@@ -45,18 +59,56 @@ class KeyPressInteractorStyle : public vtkInteractorStyleTrackballCamera
       // Output the key that was pressed
       std::cout << "Pressed " << key << std::endl;
  
-      // Handle an arrow key
-      if(key == "Up")
-        {
-        std::cout << "The up arrow was pressed." << std::endl;
-        }
+      // Display current image widget plane data
+      if(key == "space"){
+        std::cout << "Displaying image plane data." << std::endl;
+		planeWidget->RestrictPlaneToVolumeOn(); 
+		planeWidget->SetResliceInterpolateToCubic();
+		planeWidget->DisplayTextOn();
+		planeWidget->UseContinuousCursorOn();
+		planeWidget->UpdatePlacement();
+		vtkSmartPointer<vtkImageData> myImageData = planeWidget->GetResliceOutput();
+
+		int* dims = myImageData->GetDimensions();
+        std::cout << "Dims: " << " x: " << dims[0] << " y: " << dims[1] << " z: " << dims[2] << std::endl;
+
+		
+		// Create image mapper to render sliced plane
+		vtkSmartPointer<vtkImageMapper> imageMapper = vtkSmartPointer<vtkImageMapper>::New();
+		imageMapper->SetInputData(myImageData);
+
+        //imageMapper->SetColorWindow(255);
+        //imageMapper->SetColorLevel(127.5);
+
+		vtkSmartPointer<vtkActor2D> imageActor = vtkSmartPointer<vtkActor2D>::New();
+        imageActor->SetMapper(imageMapper);
+        //imageActor->SetPosition(20, 20);
+        // Setup renderers
+        vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
  
-      // Handle a "normal" key
-      if(key == "a")
-        {
-        std::cout << "The a key was pressed." << std::endl;
-        }
+        // Setup render window
+        vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
  
+        renderWindow->AddRenderer(renderer);
+ 
+        // Setup render window interactor
+        vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+ 
+        vtkSmartPointer<vtkInteractorStyleImage> style = vtkSmartPointer<vtkInteractorStyleImage>::New();
+ 
+        renderWindowInteractor->SetInteractorStyle(style);
+ 
+        // Render and start interaction
+        renderWindowInteractor->SetRenderWindow(renderWindow);
+ 
+        //renderer->AddViewProp(imageActor);
+        renderer->AddActor2D(imageActor);
+ 
+        renderWindow->Render();
+        renderWindowInteractor->Start();
+		
+      }
+
       // Forward events
       vtkInteractorStyleTrackballCamera::OnKeyPress();
     }
@@ -132,6 +184,73 @@ int main(int argc, char* argv[])
   //cleanFilter->SetTolerance(0.1);
   cleanFilter->Update();
 
+
+  vtkSmartPointer<vtkImageData> whiteImage = 
+    vtkSmartPointer<vtkImageData>::New();    
+  double bounds[6];
+  cleanFilter->GetOutput()->GetBounds(bounds);
+  double spacing[3]; // desired volume spacing
+  spacing[0] = 0.5;
+  spacing[1] = 0.5;
+  spacing[2] = 0.5;
+  whiteImage->SetSpacing(spacing);
+  // compute dimensions
+  int dim[3];
+  for (int i = 0; i < 3; i++)
+    {
+    dim[i] = static_cast<int>(ceil((bounds[i * 2 + 1] - bounds[i * 2]) / spacing[i]));
+    }
+  whiteImage->SetDimensions(dim);
+  whiteImage->SetExtent(0, dim[0] - 1, 0, dim[1] - 1, 0, dim[2] - 1);
+ 
+  double origin[3];
+  origin[0] = bounds[0] + spacing[0] / 2;
+  origin[1] = bounds[2] + spacing[1] / 2;
+  origin[2] = bounds[4] + spacing[2] / 2;
+  whiteImage->SetOrigin(origin);
+ 
+#if VTK_MAJOR_VERSION <= 5
+  whiteImage->SetScalarTypeToUnsignedChar();
+  whiteImage->AllocateScalars();
+#else
+  whiteImage->AllocateScalars(VTK_UNSIGNED_CHAR,1);
+#endif
+  // fill the image with foreground voxels:
+  unsigned char inval = 255;
+  unsigned char outval = 0;
+  vtkIdType count = whiteImage->GetNumberOfPoints();
+  for (vtkIdType i = 0; i < count; ++i)
+    {
+    whiteImage->GetPointData()->GetScalars()->SetTuple1(i, inval);
+    }
+ 
+  // polygonal data --> image stencil:
+  vtkSmartPointer<vtkPolyDataToImageStencil> pol2stenc = 
+    vtkSmartPointer<vtkPolyDataToImageStencil>::New();
+#if VTK_MAJOR_VERSION <= 5
+  pol2stenc->SetInput(pd);
+#else
+  pol2stenc->SetInputData(cleanFilter->GetOutput());
+#endif
+  pol2stenc->SetOutputOrigin(origin);
+  pol2stenc->SetOutputSpacing(spacing);
+  pol2stenc->SetOutputWholeExtent(whiteImage->GetExtent());
+  pol2stenc->Update();
+ 
+  // cut the corresponding white image and set the background:
+  vtkSmartPointer<vtkImageStencil> imgstenc = 
+    vtkSmartPointer<vtkImageStencil>::New();
+#if VTK_MAJOR_VERSION <= 5
+  imgstenc->SetInput(whiteImage);
+  imgstenc->SetStencil(pol2stenc->GetOutput());
+#else
+  imgstenc->SetInputData(whiteImage);
+  imgstenc->SetStencilConnection(pol2stenc->GetOutputPort());
+#endif
+  imgstenc->ReverseStencilOff();
+  imgstenc->SetBackgroundValue(outval);
+  imgstenc->Update();
+
   // Visualization
   vtkSmartPointer<vtkPolyDataMapper> map = 
     vtkSmartPointer<vtkPolyDataMapper>::New();
@@ -166,10 +285,13 @@ int main(int argc, char* argv[])
   style->SetCurrentRenderer(ren);
 
   // Create plane widget and initialize position of widget.
-  vtkSmartPointer<vtkImagePlaneWidget> planeWidget = 
-    vtkSmartPointer<vtkImagePlaneWidget>::New();
+  planeWidget = vtkSmartPointer<vtkImagePlaneWidget>::New();
   planeWidget->SetInteractor(renderWindowInteractor);
 
+  planeWidget->SetInputData(imgstenc->GetOutput());
+
+  planeWidget->GetPlaneProperty()->SetColor(0,0,1);
+  planeWidget->SetResliceInterpolateToCubic();
   // Adjust initial camera position
   vtkSmartPointer<vtkCamera> camera = 
     vtkSmartPointer<vtkCamera>::New();
