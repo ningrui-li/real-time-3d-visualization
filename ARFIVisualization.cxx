@@ -27,6 +27,42 @@
 #include <vtkImagePlaneWidget.h>
 #include <vtkInteractorStyleTrackballActor.h>
 #include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkObjectFactory.h>
+
+// Define interaction style
+class KeyPressInteractorStyle : public vtkInteractorStyleTrackballCamera
+{
+  public:
+    static KeyPressInteractorStyle* New();
+    vtkTypeMacro(KeyPressInteractorStyle, vtkInteractorStyleTrackballCamera);
+ 
+    virtual void OnKeyPress() 
+    {
+      // Get the keypress
+      vtkRenderWindowInteractor *rwi = this->Interactor;
+      std::string key = rwi->GetKeySym();
+ 
+      // Output the key that was pressed
+      std::cout << "Pressed " << key << std::endl;
+ 
+      // Handle an arrow key
+      if(key == "Up")
+        {
+        std::cout << "The up arrow was pressed." << std::endl;
+        }
+ 
+      // Handle a "normal" key
+      if(key == "a")
+        {
+        std::cout << "The a key was pressed." << std::endl;
+        }
+ 
+      // Forward events
+      vtkInteractorStyleTrackballCamera::OnKeyPress();
+    }
+ 
+};
+vtkStandardNewMacro(KeyPressInteractorStyle);
 
 int main(int argc, char* argv[])
 {
@@ -86,7 +122,7 @@ int main(int argc, char* argv[])
 	appendFilter->Update();
 
 	// Update angle offset between each image.
-	angle += 5;
+	angle += 1;
   }
 
   // Remove any duplicate points.
@@ -124,9 +160,10 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkRenderWindowInteractor>::New();
   renderWindowInteractor->SetRenderWindow(renWin);
 
-  vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = 
-    vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
+  vtkSmartPointer<KeyPressInteractorStyle> style = 
+    vtkSmartPointer<KeyPressInteractorStyle>::New();
   renderWindowInteractor->SetInteractorStyle(style);
+  style->SetCurrentRenderer(ren);
 
   // Create plane widget and initialize position of widget.
   vtkSmartPointer<vtkImagePlaneWidget> planeWidget = 
@@ -159,10 +196,8 @@ int main(int argc, char* argv[])
   planeWidget->SetPoint2(0, 300, 0);
   planeWidget->UpdatePlacement();
   planeWidget->On();
-  // Begin mouse interaction
+
   renderWindowInteractor->Start();
-
-
 
   return EXIT_SUCCESS;
 }
