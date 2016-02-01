@@ -28,6 +28,11 @@
 
 #include <vtkAppendFilter.h>
 #include <vtkDataSetTriangleFilter.h>
+#include <vtkClipDataSet.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPoints.h>
+#include <vtkProbeFilter.h>
+#include <vtkDelaunay2D.h>
 
 int main(int argc, char* argv[])
 {
@@ -119,18 +124,72 @@ int main(int argc, char* argv[])
     #endif
     appendFilter->Update();
     
-    //
+    // Triangulate the image data.
     vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
         vtkSmartPointer<vtkDataSetTriangleFilter>::New();
     triangleFilter->SetInputConnection(appendFilter->GetOutputPort());    
     triangleFilter->Update();
-
     // Cast output of appendFilter to vtkUnstructuredGrid
     vtkSmartPointer<vtkUnstructuredGrid> unstructuredGrid =
         vtkSmartPointer<vtkUnstructuredGrid>::New();
     unstructuredGrid->ShallowCopy(triangleFilter->GetOutput());
-    
-    // Create a mapper.
+
+    // Apply probe filter for interpolation.
+    std::cout << unstructuredGrid->GetBounds()[0] << std::endl <<
+        unstructuredGrid->GetBounds()[1] << std::endl <<
+        unstructuredGrid->GetBounds()[2] << std::endl <<
+        unstructuredGrid->GetBounds()[3] << std::endl <<
+        unstructuredGrid->GetBounds()[4] << std::endl <<
+        unstructuredGrid->GetBounds()[5] << std::endl;
+
+
+    // Create a grid of points to interpolate over
+    vtkSmartPointer<vtkPoints> gridPoints =
+        vtkSmartPointer<vtkPoints>::New();
+    unsigned int gridSize = unstructuredGrid->GetBounds()[1];
+    for (unsigned int x = 0; x < gridSize; x++)
+        for (unsigned int y = 0; y < gridSize; y++)
+            gridPoints->InsertNextPoint(x, y, 5);
+    std::cout << gridPoints->GetBounds()[0] << " " << gridPoints->GetBounds()[1] << std::endl;
+
+    // Create a dataset from the grid points
+    vtkSmartPointer<vtkPolyData> gridPolyData =
+        vtkSmartPointer<vtkPolyData>::New();
+    gridPolyData->SetPoints(gridPoints);
+
+    // Perform the interpolation
+    vtkSmartPointer<vtkProbeFilter> probeFilter =
+        vtkSmartPointer<vtkProbeFilter>::New();
+    probeFilter->SetSourceConnection(triangleFilter->GetOutputPort());
+#if VTK_MAJOR_VERSION <= 5
+    probeFilter->SetInput(gridPolyData); // 
+    // Interpolate 'Source' at these points
+#else
+    probeFilter->SetInputData(gridPolyData); // 
+    // Interpolate 'Source' at these points
+#endif
+    probeFilter->Update();
+
+    // Mesh the output grid points
+    vtkSmartPointer<vtkDelaunay2D> gridDelaunay =
+        vtkSmartPointer<vtkDelaunay2D>::New();
+    gridDelaunay->SetInputConnection (probeFilter->GetOutputPort());
+    gridDelaunay->Update();
+
+    // Create mapper and actor for interpolated points.
+    vtkSmartPointer<vtkDataSetMapper> gridMapper =
+        vtkSmartPointer<vtkDataSetMapper>::New();
+    gridMapper->SetInputConnection(gridDelaunay->GetOutputPort());
+    //gridMapper->ScalarVisibilityOff();
+
+    vtkSmartPointer<vtkActor> gridActor =
+        vtkSmartPointer<vtkActor>::New();
+    gridActor->SetMapper(gridMapper);
+    //gridActor->GetProperty()->SetColor(0.0, 0.0, 1.0); //(R,G,B)
+    //gridActor->GetProperty()->SetPointSize(3);
+ 
+
+    // Create a mapper and actor for image data.
     vtkSmartPointer<vtkDataSetMapper> mapper = 
         vtkSmartPointer<vtkDataSetMapper>::New();
     #if VTK_MAJOR_VERSION <= 5
@@ -138,8 +197,6 @@ int main(int argc, char* argv[])
     #else
         mapper->SetInputData(unstructuredGrid);
     #endif
-
-    // Create an actor.
     vtkSmartPointer<vtkActor> actor = 
         vtkSmartPointer<vtkActor>::New();
     actor->SetMapper(mapper);
@@ -157,7 +214,8 @@ int main(int argc, char* argv[])
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
     renderer->AddActor(actor);
-    renderer->SetBackground(1, 1, 1); // Background color white
+    renderer->AddActor(gridActor);
+    renderer->SetBackground(.1, .2, .3); // Background color white
 
     renderWindow->Render();
 
