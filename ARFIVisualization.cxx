@@ -37,6 +37,8 @@
 #include <vtkTransform.h>
 #include <vtkTransformFilter.h>
 
+#include <vtkAxesActor.h>
+#include <vtkOrientationMarkerWidget.h>
 int main(int argc, char* argv[])
 {
     vtkSmartPointer<vtkJPEGReader> reader;
@@ -237,6 +239,19 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = 
         vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    // Add orientation axes
+    vtkSmartPointer<vtkAxesActor> axes = 
+        vtkSmartPointer<vtkAxesActor>::New();
+
+    vtkSmartPointer<vtkOrientationMarkerWidget> widget = 
+        vtkSmartPointer<vtkOrientationMarkerWidget>::New();
+    widget->SetOutlineColor( 0.9300, 0.5700, 0.1300 );
+    widget->SetOrientationMarker( axes );
+    widget->SetInteractor( renderWindowInteractor );
+    //widget->SetViewport( 0.0, 0.0, 0.4, 0.4 );
+    widget->SetEnabled( 1 );
+    widget->InteractiveOn();
 
     renderer->AddActor(actor);
     renderer->AddActor(gridActor);
