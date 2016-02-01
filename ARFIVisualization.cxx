@@ -27,7 +27,7 @@
 #include <vtkImageData.h>
 
 #include <vtkAppendFilter.h>
-
+#include <vtkDataSetTriangleFilter.h>
 
 int main(int argc, char* argv[])
 {
@@ -40,8 +40,8 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkAppendPolyData> appendPolyDataFilter =
         vtkSmartPointer<vtkAppendPolyData>::New();
 
-    int angle = 0;
-    int angleOffset = 1; // Rotate each image by 20 degrees.
+    double angle = 0.0;
+    double angleOffset = 5; // Rotate each image by 20 degrees.
 
     /* 
     Read in each image, convert it to a vtkStructuredGrid, then rotate it by
@@ -119,11 +119,16 @@ int main(int argc, char* argv[])
     #endif
     appendFilter->Update();
     
-    
+    //
+    vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
+        vtkSmartPointer<vtkDataSetTriangleFilter>::New();
+    triangleFilter->SetInputConnection(appendFilter->GetOutputPort());    
+    triangleFilter->Update();
+
     // Cast output of appendFilter to vtkUnstructuredGrid
     vtkSmartPointer<vtkUnstructuredGrid> unstructuredGrid =
         vtkSmartPointer<vtkUnstructuredGrid>::New();
-    unstructuredGrid->ShallowCopy(appendFilter->GetOutput());
+    unstructuredGrid->ShallowCopy(triangleFilter->GetOutput());
     
     // Create a mapper.
     vtkSmartPointer<vtkDataSetMapper> mapper = 
