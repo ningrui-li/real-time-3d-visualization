@@ -33,6 +33,9 @@
 #include <vtkPoints.h>
 #include <vtkProbeFilter.h>
 #include <vtkDelaunay2D.h>
+#include <vtkPlaneSource.h>
+#include <vtkTransform.h>
+#include <vtkTransformFilter.h>
 
 int main(int argc, char* argv[])
 {
@@ -46,7 +49,7 @@ int main(int argc, char* argv[])
         vtkSmartPointer<vtkAppendPolyData>::New();
 
     double angle = 0.0;
-    double angleOffset = 5; // Rotate each image by 20 degrees.
+    double angleOffset = 20; // Rotate each image by 20 degrees.
 
     /* 
     Read in each image, convert it to a vtkStructuredGrid, then rotate it by
@@ -129,10 +132,21 @@ int main(int argc, char* argv[])
         vtkSmartPointer<vtkDataSetTriangleFilter>::New();
     triangleFilter->SetInputConnection(appendFilter->GetOutputPort());    
     triangleFilter->Update();
+
+
     // Cast output of appendFilter to vtkUnstructuredGrid
     vtkSmartPointer<vtkUnstructuredGrid> unstructuredGrid =
         vtkSmartPointer<vtkUnstructuredGrid>::New();
     unstructuredGrid->ShallowCopy(triangleFilter->GetOutput());
+
+    std::cout << unstructuredGrid->GetScalarRange()[0] << " " << unstructuredGrid->GetScalarRange()[1] << std::endl;
+
+    /*
+    // Perform triangulation with vtkDelaunay3D
+    vtkSmartPointer<vtkDelaunay3D> delaunay3D = vtkSmartPointer<vtkDelaunay3D>::New();
+    delaunay3D->SetInputConnection (triangleFilter->GetOutputPort());
+    delaunay3D->Update();
+    */
 
     // Apply probe filter for interpolation.
     std::cout << unstructuredGrid->GetBounds()[0] << std::endl <<
@@ -141,34 +155,45 @@ int main(int argc, char* argv[])
         unstructuredGrid->GetBounds()[3] << std::endl <<
         unstructuredGrid->GetBounds()[4] << std::endl <<
         unstructuredGrid->GetBounds()[5] << std::endl;
+    
+    // Create a plane to interpolate over
 
+    // Scale factor -> should probably replace with setting
+    // slice plane heigth and width based on image resolution.
+    vtkSmartPointer<vtkTransform> scaleTransform =
+        vtkSmartPointer<vtkTransform>::New();
+    scaleTransform->Scale(70,1,70);
 
-    // Create a grid of points to interpolate over
-    vtkSmartPointer<vtkPoints> gridPoints =
-        vtkSmartPointer<vtkPoints>::New();
-    unsigned int gridSize = unstructuredGrid->GetBounds()[1];
-    for (unsigned int x = 0; x < gridSize; x++)
-        for (unsigned int y = 0; y < gridSize; y++)
-            gridPoints->InsertNextPoint(x, y, 5);
-    std::cout << gridPoints->GetBounds()[0] << " " << gridPoints->GetBounds()[1] << std::endl;
+    vtkSmartPointer<vtkPlaneSource> interpPlane =
+        vtkSmartPointer<vtkPlaneSource>::New();
+    interpPlane->SetNormal(0.0, 0.0, 1.0);
+    interpPlane->SetOrigin(0.0, 2.0, -1.0);
+    interpPlane->SetCenter(0.0, 0.0, 0.0);
+    interpPlane->SetResolution(100, 100);
+    interpPlane->Update();
 
-    // Create a dataset from the grid points
-    vtkSmartPointer<vtkPolyData> gridPolyData =
-        vtkSmartPointer<vtkPolyData>::New();
-    gridPolyData->SetPoints(gridPoints);
+    vtkSmartPointer<vtkTransformFilter> scaleTransformFilter =
+        vtkSmartPointer<vtkTransformFilter>::New();
+    scaleTransformFilter->SetInputConnection(interpPlane->GetOutputPort());
+    scaleTransformFilter->SetTransform(scaleTransform);
+    scaleTransformFilter->Update();
+    //std::cout << gridPoints->GetBounds()[0] << " " << gridPoints->GetBounds()[1] << std::endl;
+
 
     // Perform the interpolation
     vtkSmartPointer<vtkProbeFilter> probeFilter =
         vtkSmartPointer<vtkProbeFilter>::New();
     probeFilter->SetSourceConnection(triangleFilter->GetOutputPort());
 #if VTK_MAJOR_VERSION <= 5
-    probeFilter->SetInput(gridPolyData); // 
+    probeFilter->SetInput(gridPolyDat)a; // 
     // Interpolate 'Source' at these points
 #else
-    probeFilter->SetInputData(gridPolyData); // 
+    probeFilter->SetInputData(scaleTransformFilter->GetOutput());
     // Interpolate 'Source' at these points
 #endif
     probeFilter->Update();
+    
+    //std::cout << triangleFilter->GetOutput()[0] << std::endl;
 
     // Mesh the output grid points
     vtkSmartPointer<vtkDelaunay2D> gridDelaunay =
@@ -179,7 +204,7 @@ int main(int argc, char* argv[])
     // Create mapper and actor for interpolated points.
     vtkSmartPointer<vtkDataSetMapper> gridMapper =
         vtkSmartPointer<vtkDataSetMapper>::New();
-    gridMapper->SetInputConnection(gridDelaunay->GetOutputPort());
+    gridMapper->SetInputConnection(probeFilter->GetOutputPort());
     //gridMapper->ScalarVisibilityOff();
 
     vtkSmartPointer<vtkActor> gridActor =
