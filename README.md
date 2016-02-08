@@ -49,3 +49,8 @@ Running the ARFIVisualiation
 Test that the script works by inputting image names through standard input (stdin).  For example:
     
     `ls -d images/JPG/dog-* | ./build/ARFIVisualization `
+
+    
+Instructions on Using the Unit Tests
+------------------------------------
+See [here](https://blog.feabhas.com/2012/03/setting-up-googletest-with-visual-c-2010-express-edition/) for instructions on how to set up the unit tests (Google Test) for this project.
