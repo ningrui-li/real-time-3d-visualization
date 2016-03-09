@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
         vtkSmartPointer<vtkAppendPolyData>::New();
 
     double angle = 0.0;
-    double angleOffset = 20; // Rotate each image by 20 degrees.
+    double angleOffset = 5; // Rotate each image by 20 degrees.
 
     /* 
     Read in each image, convert it to a vtkStructuredGrid, then rotate it by
@@ -150,14 +150,7 @@ int main(int argc, char* argv[])
     delaunay3D->Update();
     */
 
-    // Apply probe filter for interpolation.
-    std::cout << unstructuredGrid->GetBounds()[0] << std::endl <<
-        unstructuredGrid->GetBounds()[1] << std::endl <<
-        unstructuredGrid->GetBounds()[2] << std::endl <<
-        unstructuredGrid->GetBounds()[3] << std::endl <<
-        unstructuredGrid->GetBounds()[4] << std::endl <<
-        unstructuredGrid->GetBounds()[5] << std::endl;
-    
+    // Apply probe filter for interpolation.    
     // Create a plane to interpolate over
 
     // Scale factor -> should probably replace with setting
@@ -168,9 +161,9 @@ int main(int argc, char* argv[])
 
     vtkSmartPointer<vtkPlaneSource> interpPlane =
         vtkSmartPointer<vtkPlaneSource>::New();
-    interpPlane->SetNormal(0.0, 0.0, 1.0);
-    interpPlane->SetOrigin(0.0, 2.0, -1.0);
-    interpPlane->SetCenter(0.0, 0.0, 0.0);
+    interpPlane->SetNormal(1.0, 1.0, 0.0);
+    //interpPlane->SetOrigin(0.0, 2.0, -1.0);
+    interpPlane->SetCenter(0.0, 10.0, 0.0);
     interpPlane->SetResolution(100, 100);
     interpPlane->Update();
 
@@ -197,11 +190,6 @@ int main(int argc, char* argv[])
     
     //std::cout << triangleFilter->GetOutput()[0] << std::endl;
 
-    // Mesh the output grid points
-    vtkSmartPointer<vtkDelaunay2D> gridDelaunay =
-        vtkSmartPointer<vtkDelaunay2D>::New();
-    gridDelaunay->SetInputConnection (probeFilter->GetOutputPort());
-    gridDelaunay->Update();
 
     // Create mapper and actor for interpolated points.
     vtkSmartPointer<vtkDataSetMapper> gridMapper =
