@@ -36,6 +36,7 @@
 #include <vtkPlaneSource.h>
 #include <vtkTransform.h>
 #include <vtkTransformFilter.h>
+#include <vtkClipDataSet.h>
 
 #include <vtkAxesActor.h>
 #include <vtkOrientationMarkerWidget.h>
@@ -142,13 +143,6 @@ int main(int argc, char* argv[])
     unstructuredGrid->ShallowCopy(triangleFilter->GetOutput());
 
     std::cout << unstructuredGrid->GetScalarRange()[0] << " " << unstructuredGrid->GetScalarRange()[1] << std::endl;
-
-    /*
-    // Perform triangulation with vtkDelaunay3D
-    vtkSmartPointer<vtkDelaunay3D> delaunay3D = vtkSmartPointer<vtkDelaunay3D>::New();
-    delaunay3D->SetInputConnection (triangleFilter->GetOutputPort());
-    delaunay3D->Update();
-    */
 
     // Apply probe filter for interpolation.    
     // Create a plane to interpolate over
