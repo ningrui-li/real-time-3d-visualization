@@ -37,6 +37,7 @@
 #include <vtkTransform.h>
 #include <vtkTransformFilter.h>
 #include <vtkClipDataSet.h>
+#include <vtkPlane.h>
 
 #include <vtkAxesActor.h>
 #include <vtkOrientationMarkerWidget.h>
@@ -144,51 +145,35 @@ int main(int argc, char* argv[])
 
     std::cout << unstructuredGrid->GetScalarRange()[0] << " " << unstructuredGrid->GetScalarRange()[1] << std::endl;
 
-    // Apply probe filter for interpolation.    
-    // Create a plane to interpolate over
-
-    // Scale factor -> should probably replace with setting
-    // slice plane heigth and width based on image resolution.
-    vtkSmartPointer<vtkTransform> scaleTransform =
-        vtkSmartPointer<vtkTransform>::New();
-    scaleTransform->Scale(70,1,70);
-
-    vtkSmartPointer<vtkPlaneSource> interpPlane =
-        vtkSmartPointer<vtkPlaneSource>::New();
-    interpPlane->SetNormal(1.0, 1.0, 0.0);
-    //interpPlane->SetOrigin(0.0, 2.0, -1.0);
-    interpPlane->SetCenter(0.0, 10.0, 0.0);
-    interpPlane->SetResolution(100, 100);
-    interpPlane->Update();
-
-    vtkSmartPointer<vtkTransformFilter> scaleTransformFilter =
-        vtkSmartPointer<vtkTransformFilter>::New();
-    scaleTransformFilter->SetInputConnection(interpPlane->GetOutputPort());
-    scaleTransformFilter->SetTransform(scaleTransform);
-    scaleTransformFilter->Update();
-    //std::cout << gridPoints->GetBounds()[0] << " " << gridPoints->GetBounds()[1] << std::endl;
-
+    // Apply vtkClipDataSet filter for interpolation.    
+    // Create a vtkPlane (implicit function) to interpolate over
+    vtkSmartPointer<vtkPlane> clipPlane =
+        vtkSmartPointer<vtkPlane>::New();
+    clipPlane->SetOrigin(0.0, 0.0, 10.0);
+    clipPlane->SetNormal(1.0, 0.0, 1.0);
 
     // Perform the interpolation
-    vtkSmartPointer<vtkProbeFilter> probeFilter =
-        vtkSmartPointer<vtkProbeFilter>::New();
-    probeFilter->SetSourceConnection(triangleFilter->GetOutputPort());
+    vtkSmartPointer<vtkClipDataSet> clipDataSet =
+        vtkSmartPointer<vtkClipDataSet>::New();
+    clipDataSet->SetClipFunction(clipPlane);
+    clipDataSet->InsideOutOn();
+
+    clipDataSet->SetInputConnection(triangleFilter->GetOutputPort());
 #if VTK_MAJOR_VERSION <= 5
     probeFilter->SetInput(gridPolyDat)a; // 
     // Interpolate 'Source' at these points
 #else
-    probeFilter->SetInputData(scaleTransformFilter->GetOutput());
+    clipDataSet->SetInputData(triangleFilter->GetOutput());
     // Interpolate 'Source' at these points
 #endif
-    probeFilter->Update();
+    clipDataSet->Update();
     
-    //std::cout << triangleFilter->GetOutput()[0] << std::endl;
-
+    std::cout << clipDataSet->GetInsideOut() << std::endl;
 
     // Create mapper and actor for interpolated points.
     vtkSmartPointer<vtkDataSetMapper> gridMapper =
         vtkSmartPointer<vtkDataSetMapper>::New();
-    gridMapper->SetInputConnection(probeFilter->GetOutputPort());
+    gridMapper->SetInputConnection(clipDataSet->GetOutputPort());
     //gridMapper->ScalarVisibilityOff();
 
     vtkSmartPointer<vtkActor> gridActor =
@@ -204,7 +189,7 @@ int main(int argc, char* argv[])
     #if VTK_MAJOR_VERSION <= 5
         mapper->SetInputConnection(unstructuredGrid->GetProducerPort());
     #else
-        mapper->SetInputData(unstructuredGrid);
+        mapper->SetInputData(clipDataSet->GetOutput());
     #endif
     vtkSmartPointer<vtkActor> actor = 
         vtkSmartPointer<vtkActor>::New();
