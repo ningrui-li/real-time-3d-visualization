@@ -151,14 +151,14 @@ int main(int argc, char* argv[])
     std::cout << "x: (" << bounds[0] << ", " << bounds[1] << ")" << std::endl;
     std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
     std::cout << "z: (" << bounds[4] << ", " << bounds[5] << ")" << std::endl;
-
+    bounds[5] = -1*bounds[4];
     // Step 2: Use bounds to determine locations where we can sample the 
     // vtkStructuredGrid.
     
     // Determine spacing in each dimension based on bounds and grid size.
-    int numXPoints = 100; // 100x100x100 grid
-    int numYPoints = 100;
-    int numZPoints = 100;
+    int numXPoints = 30; // 100x100x100 grid
+    int numYPoints = 30;
+    int numZPoints = 30;
 
     double spacingX = (bounds[1]-bounds[0])/(double)(numXPoints);
     double spacingY = (bounds[3]-bounds[2])/(double)(numYPoints);
@@ -172,10 +172,10 @@ int main(int argc, char* argv[])
     // Construct vtkStructuredGrid based on this example:
     // http://www.vtk.org/Wiki/VTK/Examples/Cxx/StructuredGrid/StructuredGrid
     vtkSmartPointer<vtkStructuredGrid> structuredGrid =
-    vtkSmartPointer<vtkStructuredGrid>::New();
+        vtkSmartPointer<vtkStructuredGrid>::New();
  
     vtkSmartPointer<vtkPoints> points =
-    vtkSmartPointer<vtkPoints>::New();
+        vtkSmartPointer<vtkPoints>::New();
 
     for (double k = bounds[4]; k < bounds[5]; k += spacingZ){
         for (double j = bounds[2]; j < bounds[3]; j += spacingY){
@@ -188,10 +188,24 @@ int main(int argc, char* argv[])
     structuredGrid->SetDimensions(numXPoints, numYPoints, numZPoints);
     structuredGrid->SetPoints(points);
 
+    // 3. Interpolate on the given vtkUnstructuredGrid images to compute 
+    // the correct value to assign each of the vtkStructuredGrid points.
+    vtkSmartPointer<vtkProbeFilter> probeFilter = 
+        vtkSmartPointer<vtkProbeFilter>::New();
+    probeFilter->SetSourceConnection(appendFilter->GetOutputPort());
+#if VTK_MAJOR_VERSION <= 5
+    probeFilter->SetInput(structuredGrid); // Interpolate 'Source' at these points
+#else
+    probeFilter->SetInputData(structuredGrid); // Interpolate 'Source' at these points
+#endif
+    probeFilter->Update();
+ 
+    std::cout << probeFilter->GetOutput() << std::endl;
+
     // Triangulate the image data.
     vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
         vtkSmartPointer<vtkDataSetTriangleFilter>::New();
-    triangleFilter->SetInputConnection(appendFilter->GetOutputPort());    
+    triangleFilter->SetInputConnection(probeFilter->GetOutputPort());    
     triangleFilter->Update();
 
 
@@ -199,8 +213,8 @@ int main(int argc, char* argv[])
     // Create a vtkPlane (implicit function) to interpolate over
     vtkSmartPointer<vtkPlane> clipPlane =
         vtkSmartPointer<vtkPlane>::New();
-    clipPlane->SetOrigin(0.0, 0.0, -5.0);
-    clipPlane->SetNormal(0.0, 0.0, 1.0);
+    clipPlane->SetOrigin(0.0, 0.0, 4.0);
+    clipPlane->SetNormal(0.0, 1.0, 1.0);
 
     // Perform the interpolation
     vtkSmartPointer<vtkClipDataSet> clipDataSet =
@@ -208,7 +222,7 @@ int main(int argc, char* argv[])
     clipDataSet->SetClipFunction(clipPlane);
     //clipDataSet->InsideOutOn();
 
-    clipDataSet->SetInputConnection(triangleFilter->GetOutputPort());
+    clipDataSet->SetInputConnection(probeFilter->GetOutputPort());
 #if VTK_MAJOR_VERSION <= 5
     probeFilter->SetInput(gridPolyDat)a; // 
     // Interpolate 'Source' at these points
@@ -237,7 +251,7 @@ int main(int argc, char* argv[])
     #if VTK_MAJOR_VERSION <= 5
         mapper->SetInputConnection(unstructuredGrid->GetProducerPort());
     #else
-        mapper->SetInputData(clipDataSet->GetOutput());
+        mapper->SetInputData(appendFilter->GetOutput());
     #endif
     vtkSmartPointer<vtkActor> actor = 
         vtkSmartPointer<vtkActor>::New();
@@ -268,7 +282,7 @@ int main(int argc, char* argv[])
     widget->SetEnabled( 1 );
     widget->InteractiveOn();
 
-    renderer->AddActor(actor);
+    //renderer->AddActor(actor);
     renderer->AddActor(gridActor);
     renderer->SetBackground(.1, .2, .3); // Background color white
 
