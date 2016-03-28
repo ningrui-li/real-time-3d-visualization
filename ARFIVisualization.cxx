@@ -33,6 +33,7 @@
 #include <vtkPoints.h>
 #include <vtkStructuredGrid.h>
 #include <vtkProbeFilter.h>
+#include <vtkDelaunay3D.h>
 
 #include <vtkPlaneSource.h>
 #include <vtkTransform.h>
@@ -132,6 +133,23 @@ int main(int argc, char* argv[])
     #endif
     appendFilter->Update();
 
+    // Triangulate the image data.
+    /*
+    vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
+        vtkSmartPointer<vtkDataSetTriangleFilter>::New();
+    triangleFilter->SetInputConnection(appendFilter->GetOutputPort());    
+    triangleFilter->Update();
+    */
+    vtkSmartPointer<vtkDelaunay3D> triangleFilter =
+        vtkSmartPointer<vtkDelaunay3D>::New();
+#if VTK_MAJOR_VERSION <= 5
+    triangleFilter->SetInput (appendFilter);
+#else
+    triangleFilter->SetInputConnection(appendFilter->GetOutputPort());
+#endif
+    triangleFilter->Update();
+
+
     /*
     Sample vtkUnstructuredGrid into a uniformly sampled vtkStructuredGrid.
 
@@ -151,14 +169,15 @@ int main(int argc, char* argv[])
     std::cout << "x: (" << bounds[0] << ", " << bounds[1] << ")" << std::endl;
     std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
     std::cout << "z: (" << bounds[4] << ", " << bounds[5] << ")" << std::endl;
-    bounds[5] = -1*bounds[4];
+    bounds[5] = -1*bounds[4]; // For some reason the extent in the Z dimension
+                              // isn't being calculated correctly...
     // Step 2: Use bounds to determine locations where we can sample the 
     // vtkStructuredGrid.
     
     // Determine spacing in each dimension based on bounds and grid size.
-    int numXPoints = 30; // 100x100x100 grid
-    int numYPoints = 30;
-    int numZPoints = 30;
+    int numXPoints = 50; // 100x100x100 grid
+    int numYPoints = 50;
+    int numZPoints = 50;
 
     double spacingX = (bounds[1]-bounds[0])/(double)(numXPoints);
     double spacingY = (bounds[3]-bounds[2])/(double)(numYPoints);
@@ -192,7 +211,7 @@ int main(int argc, char* argv[])
     // the correct value to assign each of the vtkStructuredGrid points.
     vtkSmartPointer<vtkProbeFilter> probeFilter = 
         vtkSmartPointer<vtkProbeFilter>::New();
-    probeFilter->SetSourceConnection(appendFilter->GetOutputPort());
+    probeFilter->SetSourceConnection(triangleFilter->GetOutputPort());
 #if VTK_MAJOR_VERSION <= 5
     probeFilter->SetInput(structuredGrid); // Interpolate 'Source' at these points
 #else
@@ -202,27 +221,22 @@ int main(int argc, char* argv[])
  
     std::cout << probeFilter->GetOutput() << std::endl;
 
-    // Triangulate the image data.
-    vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
-        vtkSmartPointer<vtkDataSetTriangleFilter>::New();
-    triangleFilter->SetInputConnection(probeFilter->GetOutputPort());    
-    triangleFilter->Update();
 
 
     // Apply vtkClipDataSet filter for interpolation.    
     // Create a vtkPlane (implicit function) to interpolate over
     vtkSmartPointer<vtkPlane> clipPlane =
         vtkSmartPointer<vtkPlane>::New();
-    clipPlane->SetOrigin(0.0, 0.0, 4.0);
-    clipPlane->SetNormal(0.0, 1.0, 1.0);
+    clipPlane->SetOrigin(20.0, 0.0, 0.0);
+    clipPlane->SetNormal(1.0, 0.0, 0.0);
 
     // Perform the interpolation
     vtkSmartPointer<vtkClipDataSet> clipDataSet =
         vtkSmartPointer<vtkClipDataSet>::New();
     clipDataSet->SetClipFunction(clipPlane);
-    //clipDataSet->InsideOutOn();
-
+    clipDataSet->InsideOutOn();
     clipDataSet->SetInputConnection(probeFilter->GetOutputPort());
+
 #if VTK_MAJOR_VERSION <= 5
     probeFilter->SetInput(gridPolyDat)a; // 
     // Interpolate 'Source' at these points
@@ -285,7 +299,7 @@ int main(int argc, char* argv[])
     //renderer->AddActor(actor);
     renderer->AddActor(gridActor);
     renderer->SetBackground(.1, .2, .3); // Background color white
-
+    renderer->RemoveAllLights();
     renderWindow->Render();
 
     // Start interactive window.
