@@ -31,8 +31,9 @@
 #include <vtkClipDataSet.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkPoints.h>
+#include <vtkStructuredGrid.h>
 #include <vtkProbeFilter.h>
-#include <vtkDelaunay2D.h>
+
 #include <vtkPlaneSource.h>
 #include <vtkTransform.h>
 #include <vtkTransformFilter.h>
@@ -151,7 +152,42 @@ int main(int argc, char* argv[])
     std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
     std::cout << "z: (" << bounds[4] << ", " << bounds[5] << ")" << std::endl;
 
+    // Step 2: Use bounds to determine locations where we can sample the 
+    // vtkStructuredGrid.
     
+    // Determine spacing in each dimension based on bounds and grid size.
+    int numXPoints = 100; // 100x100x100 grid
+    int numYPoints = 100;
+    int numZPoints = 100;
+
+    double spacingX = (bounds[1]-bounds[0])/(double)(numXPoints);
+    double spacingY = (bounds[3]-bounds[2])/(double)(numYPoints);
+    double spacingZ = (bounds[5]-bounds[4])/(double)(numZPoints);
+
+    std::cout << std::endl << "Spacings: " << std::endl;
+    std::cout << "x: " << spacingX << std::endl;
+    std::cout << "y: " << spacingY << std::endl;
+    std::cout << "z: " << spacingZ << std::endl;
+
+    // Construct vtkStructuredGrid based on this example:
+    // http://www.vtk.org/Wiki/VTK/Examples/Cxx/StructuredGrid/StructuredGrid
+    vtkSmartPointer<vtkStructuredGrid> structuredGrid =
+    vtkSmartPointer<vtkStructuredGrid>::New();
+ 
+    vtkSmartPointer<vtkPoints> points =
+    vtkSmartPointer<vtkPoints>::New();
+
+    for (double k = bounds[4]; k < bounds[5]; k += spacingZ){
+        for (double j = bounds[2]; j < bounds[3]; j += spacingY){
+            for (double i = bounds[0]; i < bounds[1]; i += spacingX){
+                points->InsertNextPoint(i, j, k);
+            }
+        }
+    }
+    
+    structuredGrid->SetDimensions(numXPoints, numYPoints, numZPoints);
+    structuredGrid->SetPoints(points);
+
     // Triangulate the image data.
     vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
         vtkSmartPointer<vtkDataSetTriangleFilter>::New();
