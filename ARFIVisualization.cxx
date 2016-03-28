@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
         vtkSmartPointer<vtkAppendPolyData>::New();
 
     double angle = 0.0;
-    double angleOffset = 5; // Rotate each image by 20 degrees.
+    double angleOffset = 1; // Rotate each image by 20 degrees.
 
     /* 
     Read in each image, convert it to a vtkStructuredGrid, then rotate it by
@@ -130,6 +130,27 @@ int main(int argc, char* argv[])
         appendFilter->AddInputData(cleanFilter->GetOutput());
     #endif
     appendFilter->Update();
+
+    /*
+    Sample vtkUnstructuredGrid into a uniformly sampled vtkStructuredGrid.
+
+    1. Get x, y, z extents of the vtkUnstructuredGrid.
+    2. Determine what spacing to use in these dimensions. Based on this
+       spacing, create a grid of points for the vtkStructuredGrid.
+    3. Determine the value at each of these points using vtkProbeFilter
+       for interpolation.
+    */
+
+    // Step 1: Get x, y, z extents of the vtkUnstructuredGrid.
+    
+    // Cast output of appendFilter to vtkUnstructuredGrid
+
+    double* bounds = cleanFilter->GetOutput()->GetBounds();
+    std::cout << std::endl << "Bounds: " << std::endl;
+    std::cout << "x: (" << bounds[0] << ", " << bounds[1] << ")" << std::endl;
+    std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
+    std::cout << "z: (" << bounds[4] << ", " << bounds[5] << ")" << std::endl;
+
     
     // Triangulate the image data.
     vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
@@ -138,25 +159,18 @@ int main(int argc, char* argv[])
     triangleFilter->Update();
 
 
-    // Cast output of appendFilter to vtkUnstructuredGrid
-    vtkSmartPointer<vtkUnstructuredGrid> unstructuredGrid =
-        vtkSmartPointer<vtkUnstructuredGrid>::New();
-    unstructuredGrid->ShallowCopy(triangleFilter->GetOutput());
-
-    std::cout << unstructuredGrid->GetScalarRange()[0] << " " << unstructuredGrid->GetScalarRange()[1] << std::endl;
-
     // Apply vtkClipDataSet filter for interpolation.    
     // Create a vtkPlane (implicit function) to interpolate over
     vtkSmartPointer<vtkPlane> clipPlane =
         vtkSmartPointer<vtkPlane>::New();
-    clipPlane->SetOrigin(0.0, 0.0, 10.0);
-    clipPlane->SetNormal(1.0, 0.0, 1.0);
+    clipPlane->SetOrigin(0.0, 0.0, -5.0);
+    clipPlane->SetNormal(0.0, 0.0, 1.0);
 
     // Perform the interpolation
     vtkSmartPointer<vtkClipDataSet> clipDataSet =
         vtkSmartPointer<vtkClipDataSet>::New();
     clipDataSet->SetClipFunction(clipPlane);
-    clipDataSet->InsideOutOn();
+    //clipDataSet->InsideOutOn();
 
     clipDataSet->SetInputConnection(triangleFilter->GetOutputPort());
 #if VTK_MAJOR_VERSION <= 5
@@ -167,8 +181,6 @@ int main(int argc, char* argv[])
     // Interpolate 'Source' at these points
 #endif
     clipDataSet->Update();
-    
-    std::cout << clipDataSet->GetInsideOut() << std::endl;
 
     // Create mapper and actor for interpolated points.
     vtkSmartPointer<vtkDataSetMapper> gridMapper =
