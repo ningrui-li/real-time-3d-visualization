@@ -47,8 +47,12 @@ int main(int argc, char* argv[])
 {
     vtkSmartPointer<vtkJPEGReader> reader;
     vtkSmartPointer<vtkImageDataGeometryFilter> imageDataGeometryFilter;
+
     vtkSmartPointer<vtkTransform> rotationTransform;
+    vtkSmartPointer<vtkTransform> translateTransform;
     vtkSmartPointer<vtkTransformPolyDataFilter> rotationTransformFilter;
+    vtkSmartPointer<vtkTransformPolyDataFilter> translateTransformFilter;
+
     vtkSmartPointer<vtkPolyData> myImageData;
 
     vtkSmartPointer<vtkAppendPolyData> appendPolyDataFilter =
@@ -76,6 +80,7 @@ int main(int argc, char* argv[])
     int N = imageFileNames.size(); // Number of image planes.
     double centerAngle = 0.0; // Center image planes around this angle.
     double angleOffset = 1.0; // Angle offset between image planes.
+    double translateOffset = 10.0; // How far away the plane is from the center of the transducer.
 
     for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
         imageRotationAngles.push_back(centerAngle+(int(i)-N/2)*angleOffset);
@@ -120,14 +125,22 @@ int main(int argc, char* argv[])
         imageDataGeometryFilter->SetInputConnection(reader->GetOutputPort());
         imageDataGeometryFilter->Update();
 
+        // Offset the image slightly by the transducer's radius.
+        translateTransform = vtkSmartPointer<vtkTransform>::New();
+        translateTransform->Translate(translateOffset, 0, 0);
+
+        translateTransformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+        translateTransformFilter->SetTransform(translateTransform);
+        translateTransformFilter->SetInputConnection(imageDataGeometryFilter->GetOutputPort());
+        translateTransformFilter->Update();
+
         // Rotate the image.
-        //transform->RotateWXYZ(double angle, double x, double y, double z);
         rotationTransform = vtkSmartPointer<vtkTransform>::New();
         rotationTransform->RotateWXYZ(imageRotationAngles[i], 0, 1, 0);
 
         rotationTransformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
         rotationTransformFilter->SetTransform(rotationTransform);
-        rotationTransformFilter->SetInputConnection(imageDataGeometryFilter->GetOutputPort());
+        rotationTransformFilter->SetInputConnection(translateTransformFilter->GetOutputPort());
         rotationTransformFilter->Update();
 
         myImageData = vtkSmartPointer<vtkPolyData>::New();
@@ -195,9 +208,9 @@ int main(int argc, char* argv[])
     // vtkStructuredGrid.
     
     // Determine spacing in each dimension based on bounds and grid size.
-    int numXPoints = 40; // 40x40x40 grid
-    int numYPoints = 40;
-    int numZPoints = 40;
+    int numXPoints = 50; // 40x40x40 grid
+    int numYPoints = 50;
+    int numZPoints = 50;
 
     double spacingX = (bounds[1]-bounds[0])/(double)(numXPoints);
     double spacingY = (bounds[3]-bounds[2])/(double)(numYPoints);
@@ -240,11 +253,13 @@ int main(int argc, char* argv[])
     probeFilter->Update();
     std::cout << probeFilter->GetOutput() << std::endl;
 
+    /*
     // Triangulate structured grid before clipping.
     vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
     vtkSmartPointer<vtkDataSetTriangleFilter>::New();
     triangleFilter->SetInputConnection(probeFilter->GetOutputPort());    
     triangleFilter->Update();
+    
 
     // Apply vtkClipDataSet filter for interpolation.    
     // Create a vtkPlane (implicit function) to interpolate over.
@@ -253,7 +268,7 @@ int main(int argc, char* argv[])
     clipPlane->SetOrigin(20.0, 0.0, 0.0);
     clipPlane->SetNormal(1.0, 1.0, 0.0);
 
-    // Perform the interpolation
+    // Perform the clipping.
     vtkSmartPointer<vtkClipDataSet> clipDataSet =
         vtkSmartPointer<vtkClipDataSet>::New();
     clipDataSet->SetClipFunction(clipPlane);
@@ -267,7 +282,7 @@ int main(int argc, char* argv[])
     // Interpolate 'Source' at these points
 #endif
     clipDataSet->Update();
-
+    */
     /*
     vtkPolyData* plane = clipPlane->GetOutput();
     // Create a mapper and actor
@@ -286,7 +301,7 @@ int main(int argc, char* argv[])
     // Create mapper and actor for interpolated points.
     vtkSmartPointer<vtkDataSetMapper> gridMapper =
         vtkSmartPointer<vtkDataSetMapper>::New();
-    gridMapper->SetInputConnection(triangleFilter->GetOutputPort());
+    gridMapper->SetInputConnection(probeFilter->GetOutputPort());
     //gridMapper->ScalarVisibilityOff();
 
     vtkSmartPointer<vtkActor> gridActor =
