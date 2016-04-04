@@ -54,14 +54,42 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkAppendPolyData> appendPolyDataFilter =
         vtkSmartPointer<vtkAppendPolyData>::New();
 
-    double angle = 0.0;
-    double angleOffset = 1; // Rotate each image by 20 degrees.
-
     /* 
     Read in each image, convert it to a vtkStructuredGrid, then rotate it by
     angleOffset degrees and append it to the rest of the read images.
     */
-    for (std::string imageFileName; std::getline(std::cin, imageFileName);) {
+    std::vector<std::string> imageFileNames;
+    for (std::string imageFileName; std::getline(std::cin, imageFileName);){
+        imageFileNames.push_back(imageFileName);
+    }
+
+    std::cout << imageFileNames.size() << " files total." << std::endl;
+    std::cout << "Image file names:" << std::endl;
+
+    /* 
+    Compute amount (in degrees) to rotate each image plane by, so that the 
+    image planes are centered around initialAngle degrees.
+    */
+    // Vector holding amount (in degrees) to rotate each image plane by.
+    std::vector<double> imageRotationAngles; 
+
+    int N = imageFileNames.size(); // Number of image planes.
+    double centerAngle = 0.0; // Center image planes around this angle.
+    double angleOffset = 1.0; // Angle offset between image planes.
+
+    for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
+        imageRotationAngles.push_back(centerAngle+(int(i)-N/2)*angleOffset);
+        // If there are an even number of image planes, we shift all rotations
+        // forward by half of angleOffset so that we are still centered on
+        // centerAngle.
+        if (imageFileNames.size() % 2 == 0) {
+            imageRotationAngles[i] += angleOffset/2.0;
+        }
+    }
+
+    // Apply computed rotation angles to each image plane.
+    for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
+        std::string imageFileName = imageFileNames[i];
         std::cout << imageFileName << std::endl;
 
         // Read in image data as vtkImageData.
@@ -95,7 +123,7 @@ int main(int argc, char* argv[])
         // Rotate the image.
         //transform->RotateWXYZ(double angle, double x, double y, double z);
         rotationTransform = vtkSmartPointer<vtkTransform>::New();
-        rotationTransform->RotateWXYZ(angle, 0, 1, 0);
+        rotationTransform->RotateWXYZ(imageRotationAngles[i], 0, 1, 0);
 
         rotationTransformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
         rotationTransformFilter->SetTransform(rotationTransform);
@@ -113,8 +141,6 @@ int main(int argc, char* argv[])
             appendPolyDataFilter->AddInputData(myImageData);
         #endif
         appendPolyDataFilter->Update();
-
-        angle += angleOffset;
     }
 
     // Remove any duplicate points.
@@ -163,8 +189,8 @@ int main(int argc, char* argv[])
     std::cout << "x: (" << bounds[0] << ", " << bounds[1] << ")" << std::endl;
     std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
     std::cout << "z: (" << bounds[4] << ", " << bounds[5] << ")" << std::endl;
-    bounds[5] = -1*bounds[4]; // For some reason the extent in the Z dimension
-                              // isn't being calculated correctly...
+    //bounds[5] = -1*bounds[4]; // For some reason the extent in the Z dimension
+                           // isn't being calculated correctly...
     // Step 2: Use bounds to determine locations where we can sample the 
     // vtkStructuredGrid.
     
