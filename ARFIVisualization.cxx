@@ -133,22 +133,16 @@ int main(int argc, char* argv[])
     #endif
     appendFilter->Update();
 
-    // Triangulate the image data.
-    /*
-    vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
-        vtkSmartPointer<vtkDataSetTriangleFilter>::New();
-    triangleFilter->SetInputConnection(appendFilter->GetOutputPort());    
-    triangleFilter->Update();
-    */
-    vtkSmartPointer<vtkDelaunay3D> triangleFilter =
+    // Triangulate the image data.    
+    vtkSmartPointer<vtkDelaunay3D> delaunayFilter =
         vtkSmartPointer<vtkDelaunay3D>::New();
 #if VTK_MAJOR_VERSION <= 5
-    triangleFilter->SetInput (appendFilter);
+    delaunayFilter->SetInput(triangleFilter);
 #else
-    triangleFilter->SetInputConnection(appendFilter->GetOutputPort());
+    delaunayFilter->SetInputConnection(appendFilter->GetOutputPort());
 #endif
-    triangleFilter->Update();
-
+    delaunayFilter->Update();
+    
 
     /*
     Sample vtkUnstructuredGrid into a uniformly sampled vtkStructuredGrid.
@@ -175,9 +169,9 @@ int main(int argc, char* argv[])
     // vtkStructuredGrid.
     
     // Determine spacing in each dimension based on bounds and grid size.
-    int numXPoints = 50; // 100x100x100 grid
-    int numYPoints = 50;
-    int numZPoints = 50;
+    int numXPoints = 40; // 40x40x40 grid
+    int numYPoints = 40;
+    int numZPoints = 40;
 
     double spacingX = (bounds[1]-bounds[0])/(double)(numXPoints);
     double spacingY = (bounds[3]-bounds[2])/(double)(numYPoints);
@@ -211,34 +205,36 @@ int main(int argc, char* argv[])
     // the correct value to assign each of the vtkStructuredGrid points.
     vtkSmartPointer<vtkProbeFilter> probeFilter = 
         vtkSmartPointer<vtkProbeFilter>::New();
-    probeFilter->SetSourceConnection(triangleFilter->GetOutputPort());
+    probeFilter->SetSourceConnection(delaunayFilter->GetOutputPort());
 #if VTK_MAJOR_VERSION <= 5
     probeFilter->SetInput(structuredGrid); // Interpolate 'Source' at these points
 #else
     probeFilter->SetInputData(structuredGrid); // Interpolate 'Source' at these points
 #endif
     probeFilter->Update();
- 
     std::cout << probeFilter->GetOutput() << std::endl;
 
-
+    // Triangulate structured grid before clipping.
+    vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
+    vtkSmartPointer<vtkDataSetTriangleFilter>::New();
+    triangleFilter->SetInputConnection(probeFilter->GetOutputPort());    
+    triangleFilter->Update();
 
     // Apply vtkClipDataSet filter for interpolation.    
-    // Create a vtkPlane (implicit function) to interpolate over
+    // Create a vtkPlane (implicit function) to interpolate over.
     vtkSmartPointer<vtkPlane> clipPlane =
         vtkSmartPointer<vtkPlane>::New();
     clipPlane->SetOrigin(20.0, 0.0, 0.0);
-    clipPlane->SetNormal(1.0, 0.0, 0.0);
+    clipPlane->SetNormal(1.0, 1.0, 0.0);
 
     // Perform the interpolation
     vtkSmartPointer<vtkClipDataSet> clipDataSet =
         vtkSmartPointer<vtkClipDataSet>::New();
     clipDataSet->SetClipFunction(clipPlane);
     clipDataSet->InsideOutOn();
-    clipDataSet->SetInputConnection(probeFilter->GetOutputPort());
 
 #if VTK_MAJOR_VERSION <= 5
-    probeFilter->SetInput(gridPolyDat)a; // 
+    probeFilter->SetInput(gridPolyData); 
     // Interpolate 'Source' at these points
 #else
     clipDataSet->SetInputData(triangleFilter->GetOutput());
@@ -246,10 +242,25 @@ int main(int argc, char* argv[])
 #endif
     clipDataSet->Update();
 
+    /*
+    vtkPolyData* plane = clipPlane->GetOutput();
+    // Create a mapper and actor
+    vtkSmartPointer<vtkPolyDataMapper> planeMapper =
+        vtkSmartPointer<vtkPolyDataMapper>::New();
+#if VTK_MAJOR_VERSION <= 5
+    planeMapper->SetInput(plane);
+#else
+    planeMapper->SetInputData(plane);
+#endif
+    vtkSmartPointer<vtkActor> planeActor =
+        vtkSmartPointer<vtkActor>::New();
+    planeActor->SetMapper(planeMapper);
+    */
+
     // Create mapper and actor for interpolated points.
     vtkSmartPointer<vtkDataSetMapper> gridMapper =
         vtkSmartPointer<vtkDataSetMapper>::New();
-    gridMapper->SetInputConnection(clipDataSet->GetOutputPort());
+    gridMapper->SetInputConnection(triangleFilter->GetOutputPort());
     //gridMapper->ScalarVisibilityOff();
 
     vtkSmartPointer<vtkActor> gridActor =
