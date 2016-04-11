@@ -305,39 +305,33 @@ int main(int argc, char* argv[])
     */
 
     // Create mapper and actor for interpolated points.
-    vtkSmartPointer<vtkDataSetMapper> gridMapper =
+    vtkSmartPointer<vtkDataSetMapper> imageVolumeMapper =
         vtkSmartPointer<vtkDataSetMapper>::New();
-    gridMapper->SetInputConnection(probeFilter->GetOutputPort());
+    imageVolumeMapper->SetInputConnection(probeFilter->GetOutputPort());
     //gridMapper->ScalarVisibilityOff();
 
-    vtkSmartPointer<vtkActor> gridActor =
+    vtkSmartPointer<vtkActor> imageVolumeActor =
         vtkSmartPointer<vtkActor>::New();
-    gridActor->SetMapper(gridMapper);
+    imageVolumeActor->SetMapper(imageVolumeMapper);
     //gridActor->GetProperty()->SetColor(0.0, 0.0, 1.0); //(R,G,B)
     //gridActor->GetProperty()->SetPointSize(3);
- 
+
 
     // Create a mapper and actor for image data.
-    vtkSmartPointer<vtkDataSetMapper> mapper = 
+    vtkSmartPointer<vtkDataSetMapper> rawImageDataMapper = 
         vtkSmartPointer<vtkDataSetMapper>::New();
     #if VTK_MAJOR_VERSION <= 5
-        mapper->SetInputConnection(unstructuredGrid->GetProducerPort());
+        rawImageDataMapper->SetInputConnection(unstructuredGrid->GetProducerPort());
     #else
-        mapper->SetInputData(appendFilter->GetOutput());
+        rawImageDataMapper->SetInputData(appendFilter->GetOutput());
     #endif
-    vtkSmartPointer<vtkActor> actor = 
+    vtkSmartPointer<vtkActor> rawImageDataActor = 
         vtkSmartPointer<vtkActor>::New();
-    actor->SetMapper(mapper);
+    rawImageDataActor->SetMapper(rawImageDataMapper);
 
     // Visualization
     
-    // Define viewport ranges
-    // (xmin, ymin, xmax, ymax)
-    double volumeViewport[4] = {0.0, 0.3, 1.0, 1.0};
-    double axialViewport[4] = {0.0, 0.0, 1.0/3.0, 0.3};
-    double coronalViewport[4] = {1.0/3.0, 0.0, 2.0/3.0, 0.3};
-    double sagittalViewport[4] = {2.0/3.0, 0.0, 1.0, 0.3};
-
+    // Center camera on image volume.
     vtkSmartPointer<vtkCamera> camera =
         vtkSmartPointer<vtkCamera>::New();
     camera->SetPosition(0, -60, 0);
@@ -347,14 +341,30 @@ int main(int argc, char* argv[])
     // The main section on the top shows the 3D image volume.
     // The row of three lower sections hold the 2D axial, coronal, and 
     // sagittal slices of the image volume.
-    vtkSmartPointer<vtkRenderer> volumeRenderer = 
+
+    // Define viewport ranges
+    // (xmin, ymin, xmax, ymax)
+    double volumeViewport[4] = { 0.0, 0.3, 1.0, 1.0 };
+    double axialViewport[4] = { 0.0, 0.0, 1.0 / 3.0, 0.3 };
+    double coronalViewport[4] = { 1.0 / 3.0, 0.0, 2.0 / 3.0, 0.3 };
+    double sagittalViewport[4] = { 2.0 / 3.0, 0.0, 1.0, 0.3 };
+
+    // Add actors for each renderer window.
+    vtkSmartPointer<vtkRenderer> volumeRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     volumeRenderer->SetActiveCamera(camera);
     volumeRenderer->SetViewport(volumeViewport);
 
+    volumeRenderer->AddActor(imageVolumeActor);
+    volumeRenderer->SetBackground(.1, .2, .3); // Set background color.
+    volumeRenderer->RemoveAllLights();
+
     vtkSmartPointer<vtkRenderer> axialSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     axialSliceRenderer->SetViewport(axialViewport);
+    axialSliceRenderer->AddActor(rawImageDataActor);
+    axialSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
+
 
     vtkSmartPointer<vtkRenderer> coronalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
@@ -363,7 +373,6 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkRenderer> sagittalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     sagittalSliceRenderer->SetViewport(sagittalViewport);
-
 
 
     vtkSmartPointer<vtkRenderWindow> renderWindow = 
@@ -378,6 +387,7 @@ int main(int argc, char* argv[])
         vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
+
     // Add orientation axes
     vtkSmartPointer<vtkAxesActor> axes = 
         vtkSmartPointer<vtkAxesActor>::New();
@@ -387,16 +397,11 @@ int main(int argc, char* argv[])
     widget->SetOutlineColor( 0.9300, 0.5700, 0.1300 );
     widget->SetOrientationMarker(axes);
     widget->SetInteractor( renderWindowInteractor );
-    widget->SetViewport(0.0, 0.35, 0.2, 0.55);
+    widget->SetViewport(0.0, 0.35, 0.2, 0.55); // bottom left corner of volume viewer
     widget->SetEnabled(1);
     widget->InteractiveOff();
 
-    //renderer->AddActor(actor);
-    volumeRenderer->AddActor(gridActor);
-    volumeRenderer->SetBackground(.1, .2, .3); // Background color white
-    volumeRenderer->RemoveAllLights();
     renderWindow->Render();
-
 
     // Start interactive window.
     renderWindowInteractor->Start();
