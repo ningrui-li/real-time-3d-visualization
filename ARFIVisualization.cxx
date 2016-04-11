@@ -340,7 +340,7 @@ int main(int argc, char* argv[])
 
     vtkSmartPointer<vtkCamera> camera =
         vtkSmartPointer<vtkCamera>::New();
-    camera->SetPosition(0, -40, 0);
+    camera->SetPosition(0, -60, 0);
     camera->SetFocalPoint(center);
 
     // Divide the main window into four separate sections.
@@ -368,10 +368,10 @@ int main(int argc, char* argv[])
 
     vtkSmartPointer<vtkRenderWindow> renderWindow = 
         vtkSmartPointer<vtkRenderWindow>::New();
-    renderWindow->AddRenderer(volumeRenderer);
     renderWindow->AddRenderer(axialSliceRenderer);
     renderWindow->AddRenderer(coronalSliceRenderer);
     renderWindow->AddRenderer(sagittalSliceRenderer);
+    renderWindow->AddRenderer(volumeRenderer);
 
 
     vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = 
@@ -385,11 +385,11 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkOrientationMarkerWidget> widget = 
         vtkSmartPointer<vtkOrientationMarkerWidget>::New();
     widget->SetOutlineColor( 0.9300, 0.5700, 0.1300 );
-    widget->SetOrientationMarker( axes );
+    widget->SetOrientationMarker(axes);
     widget->SetInteractor( renderWindowInteractor );
-    //widget->SetViewport( 0.0, 0.0, 0.4, 0.4 );
-    widget->SetEnabled( 1 );
-    widget->InteractiveOn();
+    widget->SetViewport(0.0, 0.35, 0.2, 0.55);
+    widget->SetEnabled(1);
+    widget->InteractiveOff();
 
     //renderer->AddActor(actor);
     volumeRenderer->AddActor(gridActor);
