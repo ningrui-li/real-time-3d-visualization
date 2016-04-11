@@ -330,18 +330,49 @@ int main(int argc, char* argv[])
     actor->SetMapper(mapper);
 
     // Visualization
+    
+    // Define viewport ranges
+    // (xmin, ymin, xmax, ymax)
+    double volumeViewport[4] = {0.0, 0.3, 1.0, 1.0};
+    double axialViewport[4] = {0.0, 0.0, 1.0/3.0, 0.3};
+    double coronalViewport[4] = {1.0/3.0, 0.0, 2.0/3.0, 0.3};
+    double sagittalViewport[4] = {2.0/3.0, 0.0, 1.0, 0.3};
+
     vtkSmartPointer<vtkCamera> camera =
         vtkSmartPointer<vtkCamera>::New();
     camera->SetPosition(0, -40, 0);
     camera->SetFocalPoint(center);
 
-    vtkSmartPointer<vtkRenderer> renderer = 
+    // Divide the main window into four separate sections.
+    // The main section on the top shows the 3D image volume.
+    // The row of three lower sections hold the 2D axial, coronal, and 
+    // sagittal slices of the image volume.
+    vtkSmartPointer<vtkRenderer> volumeRenderer = 
         vtkSmartPointer<vtkRenderer>::New();
-    renderer->SetActiveCamera(camera);
+    volumeRenderer->SetActiveCamera(camera);
+    volumeRenderer->SetViewport(volumeViewport);
+
+    vtkSmartPointer<vtkRenderer> axialSliceRenderer =
+        vtkSmartPointer<vtkRenderer>::New();
+    axialSliceRenderer->SetViewport(axialViewport);
+
+    vtkSmartPointer<vtkRenderer> coronalSliceRenderer =
+        vtkSmartPointer<vtkRenderer>::New();
+    coronalSliceRenderer->SetViewport(coronalViewport);
+
+    vtkSmartPointer<vtkRenderer> sagittalSliceRenderer =
+        vtkSmartPointer<vtkRenderer>::New();
+    sagittalSliceRenderer->SetViewport(sagittalViewport);
+
+
 
     vtkSmartPointer<vtkRenderWindow> renderWindow = 
         vtkSmartPointer<vtkRenderWindow>::New();
-    renderWindow->AddRenderer(renderer);
+    renderWindow->AddRenderer(volumeRenderer);
+    renderWindow->AddRenderer(axialSliceRenderer);
+    renderWindow->AddRenderer(coronalSliceRenderer);
+    renderWindow->AddRenderer(sagittalSliceRenderer);
+
 
     vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = 
         vtkSmartPointer<vtkRenderWindowInteractor>::New();
@@ -361,10 +392,11 @@ int main(int argc, char* argv[])
     widget->InteractiveOn();
 
     //renderer->AddActor(actor);
-    renderer->AddActor(gridActor);
-    renderer->SetBackground(.1, .2, .3); // Background color white
-    renderer->RemoveAllLights();
+    volumeRenderer->AddActor(gridActor);
+    volumeRenderer->SetBackground(.1, .2, .3); // Background color white
+    volumeRenderer->RemoveAllLights();
     renderWindow->Render();
+
 
     // Start interactive window.
     renderWindowInteractor->Start();
