@@ -43,6 +43,7 @@
 
 #include <vtkAxesActor.h>
 #include <vtkOrientationMarkerWidget.h>
+#include <vtkCamera.h>
 int main(int argc, char* argv[])
 {
     vtkSmartPointer<vtkJPEGReader> reader;
@@ -198,6 +199,11 @@ int main(int argc, char* argv[])
     // Cast output of appendFilter to vtkUnstructuredGrid
 
     double* bounds = cleanFilter->GetOutput()->GetBounds();
+    double center[3];
+    center[0] = (bounds[0] + bounds[1]) / 2;
+    center[1] = (bounds[2] + bounds[3]) / 2;
+    center[2] = (bounds[4] + bounds[5]) / 2;
+
     std::cout << std::endl << "Bounds: " << std::endl;
     std::cout << "x: (" << bounds[0] << ", " << bounds[1] << ")" << std::endl;
     std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
@@ -324,8 +330,14 @@ int main(int argc, char* argv[])
     actor->SetMapper(mapper);
 
     // Visualization
+    vtkSmartPointer<vtkCamera> camera =
+        vtkSmartPointer<vtkCamera>::New();
+    camera->SetPosition(0, -40, 0);
+    camera->SetFocalPoint(center);
+
     vtkSmartPointer<vtkRenderer> renderer = 
         vtkSmartPointer<vtkRenderer>::New();
+    renderer->SetActiveCamera(camera);
 
     vtkSmartPointer<vtkRenderWindow> renderWindow = 
         vtkSmartPointer<vtkRenderWindow>::New();
