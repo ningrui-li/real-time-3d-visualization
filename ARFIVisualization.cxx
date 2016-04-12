@@ -40,6 +40,9 @@
 #include <vtkTransformFilter.h>
 #include <vtkClipDataSet.h>
 #include <vtkPlane.h>
+#include <vtkSampleFunction.h>
+#include <vtkContourFilter.h>
+#include <vtkPlaneWidget.h>
 
 #include <vtkAxesActor.h>
 #include <vtkOrientationMarkerWidget.h>
@@ -259,7 +262,7 @@ int main(int argc, char* argv[])
     probeFilter->Update();
     std::cout << probeFilter->GetOutput() << std::endl;
 
-    /*
+    
     // Triangulate structured grid before clipping.
     vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
     vtkSmartPointer<vtkDataSetTriangleFilter>::New();
@@ -274,11 +277,31 @@ int main(int argc, char* argv[])
     clipPlane->SetOrigin(20.0, 0.0, 0.0);
     clipPlane->SetNormal(1.0, 1.0, 0.0);
 
+
+    /*
+    // Sample the implicit vtkPlane function so that we can
+    // visualize its position relative to the image volume.
+    vtkSmartPointer<vtkSampleFunction> clipPlaneModel = 
+        vtkSmartPointer<vtkSampleFunction>::New();
+    clipPlaneModel->SetSampleDimensions(10, 10, 10);
+    clipPlaneModel->SetImplicitFunction(clipPlane);
+    clipPlaneModel->SetModelBounds(bounds);
+
+    vtkSmartPointer<vtkContourFilter> clipPlaneContours =
+        vtkSmartPointer<vtkContourFilter>::New();
+    clipPlaneContours->SetInputConnection(clipPlaneModel->GetOutputPort());
+    clipPlaneContours->GenerateValues(1, 1, 1);
+    */
+
+    vtkSmartPointer<vtkPlaneWidget> clipPlaneWidget =
+        vtkSmartPointer<vtkPlaneWidget>::New();
+
     // Perform the clipping.
     vtkSmartPointer<vtkClipDataSet> clipDataSet =
         vtkSmartPointer<vtkClipDataSet>::New();
     clipDataSet->SetClipFunction(clipPlane);
     clipDataSet->InsideOutOn();
+
 
 #if VTK_MAJOR_VERSION <= 5
     probeFilter->SetInput(gridPolyData); 
@@ -288,7 +311,7 @@ int main(int argc, char* argv[])
     // Interpolate 'Source' at these points
 #endif
     clipDataSet->Update();
-    */
+    
     /*
     vtkPolyData* plane = clipPlane->GetOutput();
     // Create a mapper and actor
@@ -304,6 +327,18 @@ int main(int argc, char* argv[])
     planeActor->SetMapper(planeMapper);
     */
 
+    // Create a mapper and actor for image data.
+    vtkSmartPointer<vtkDataSetMapper> rawImageDataMapper =
+        vtkSmartPointer<vtkDataSetMapper>::New();
+#if VTK_MAJOR_VERSION <= 5
+    rawImageDataMapper->SetInputConnection(unstructuredGrid->GetProducerPort());
+#else
+    rawImageDataMapper->SetInputData(appendFilter->GetOutput());
+#endif
+    vtkSmartPointer<vtkActor> rawImageDataActor =
+        vtkSmartPointer<vtkActor>::New();
+    rawImageDataActor->SetMapper(rawImageDataMapper);
+
     // Create mapper and actor for interpolated points.
     vtkSmartPointer<vtkDataSetMapper> imageVolumeMapper =
         vtkSmartPointer<vtkDataSetMapper>::New();
@@ -317,17 +352,7 @@ int main(int argc, char* argv[])
     //gridActor->GetProperty()->SetPointSize(3);
 
 
-    // Create a mapper and actor for image data.
-    vtkSmartPointer<vtkDataSetMapper> rawImageDataMapper = 
-        vtkSmartPointer<vtkDataSetMapper>::New();
-    #if VTK_MAJOR_VERSION <= 5
-        rawImageDataMapper->SetInputConnection(unstructuredGrid->GetProducerPort());
-    #else
-        rawImageDataMapper->SetInputData(appendFilter->GetOutput());
-    #endif
-    vtkSmartPointer<vtkActor> rawImageDataActor = 
-        vtkSmartPointer<vtkActor>::New();
-    rawImageDataActor->SetMapper(rawImageDataMapper);
+    // Create mapper and actor for clipped image volume.
 
     // Visualization
     
@@ -365,7 +390,6 @@ int main(int argc, char* argv[])
     axialSliceRenderer->AddActor(rawImageDataActor);
     axialSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
-
     vtkSmartPointer<vtkRenderer> coronalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     coronalSliceRenderer->SetViewport(coronalViewport);
@@ -386,6 +410,11 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = 
         vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
+
+
+    clipPlaneWidget->SetInteractor(renderWindowInteractor);
+    clipPlaneWidget->On();
+    renderWindowInteractor->Initialize();
 
 
     // Add orientation axes
