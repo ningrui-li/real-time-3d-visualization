@@ -6,6 +6,7 @@
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkActor.h>
+#include <vtkObjectFactory.h>
 
 // For reading in images
 #include <vtkSmartPointer.h>
@@ -42,11 +43,57 @@
 #include <vtkPlane.h>
 #include <vtkSampleFunction.h>
 #include <vtkContourFilter.h>
+#include <vtkOutlineFilter.h>
 #include <vtkPlaneWidget.h>
 
 #include <vtkAxesActor.h>
 #include <vtkOrientationMarkerWidget.h>
 #include <vtkCamera.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+
+// Define image plane widget
+vtkSmartPointer<vtkPlaneWidget> clipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
+vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+
+// Define interaction style
+class KeyPressInteractorStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static KeyPressInteractorStyle* New();
+    vtkTypeMacro(KeyPressInteractorStyle, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnKeyPress()
+    {
+        // Get the keypress
+        vtkRenderWindowInteractor *rwi = this->Interactor;
+        std::string key = rwi->GetKeySym();
+
+        // Output the key that was pressed
+        std::cout << "Pressed " << key << std::endl;
+
+        // Handle an arrow key
+        if (key == "Up")
+        {
+            double* clipPlaneCenter = clipPlaneWidget->GetCenter();
+            clipPlaneCenter[2] += 1.0; // Move plane in the direction of its normal (+Z)
+            std::cout << clipPlaneCenter[0] << " " << clipPlaneCenter[1] << " " << clipPlaneCenter[2] << std::endl;
+            clipPlaneWidget->SetCenter(clipPlaneCenter);
+            renderWindow->Render();
+        }
+
+        // Handle a "normal" key
+        if (key == "a")
+        {
+            std::cout << "The a key was pressed." << std::endl;
+        }
+
+        // Forward events
+        vtkInteractorStyleTrackballCamera::OnKeyPress();
+    }
+
+};
+vtkStandardNewMacro(KeyPressInteractorStyle);
+
 int main(int argc, char* argv[])
 {
     vtkSmartPointer<vtkJPEGReader> reader;
@@ -62,24 +109,24 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkAppendPolyData> appendPolyDataFilter =
         vtkSmartPointer<vtkAppendPolyData>::New();
 
-    /* 
+    /*
     Read in each image, convert it to a vtkStructuredGrid, then rotate it by
     angleOffset degrees and append it to the rest of the read images.
     */
     std::vector<std::string> imageFileNames;
-    for (std::string imageFileName; std::getline(std::cin, imageFileName);){
+    for (std::string imageFileName; std::getline(std::cin, imageFileName);) {
         imageFileNames.push_back(imageFileName);
     }
 
     std::cout << imageFileNames.size() << " files total." << std::endl;
     std::cout << "Image file names:" << std::endl;
 
-    /* 
-    Compute amount (in degrees) to rotate each image plane by, so that the 
+    /*
+    Compute amount (in degrees) to rotate each image plane by, so that the
     image planes are centered around initialAngle degrees.
     */
     // Vector holding amount (in degrees) to rotate each image plane by.
-    std::vector<double> imageRotationAngles; 
+    std::vector<double> imageRotationAngles;
 
     int N = imageFileNames.size(); // Number of image planes.
     double centerAngle = 0.0; // Center image planes around this angle.
@@ -87,12 +134,12 @@ int main(int argc, char* argv[])
     double translateOffset = 10.0; // How far away the plane is from the center of the transducer.
 
     for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
-        imageRotationAngles.push_back(centerAngle+(int(i)-N/2)*angleOffset);
+        imageRotationAngles.push_back(centerAngle + (int(i) - N / 2)*angleOffset);
         // If there are an even number of image planes, we shift all rotations
         // forward by half of angleOffset so that we are still centered on
         // centerAngle.
         if (imageFileNames.size() % 2 == 0) {
-            imageRotationAngles[i] += angleOffset/2.0;
+            imageRotationAngles[i] += angleOffset / 2.0;
         }
     }
 
@@ -104,28 +151,28 @@ int main(int argc, char* argv[])
         // Read in image data as vtkImageData.
         reader = vtkSmartPointer<vtkJPEGReader>::New();
         reader->SetFileName(imageFileName.c_str());
-    
+
         /*
-        // Code for converting from 
+        // Code for converting from
         // vtkImageData -> vtkStructuredGrid -> vtkUnstructuredGrid.
-        
+
         // Convert vtkImageData to vtkStructuredGrid.
         vtkSmartPointer<vtkImageDataToPointSet> imageDataToPointSet =
-            vtkSmartPointer<vtkImageDataToPointSet>::New();
+        vtkSmartPointer<vtkImageDataToPointSet>::New();
         #if VTK_MAJOR_VERSION <= 5
-            imageDataToPointSet->SetInputConnection(reader->GetProducerPort());
+        imageDataToPointSet->SetInputConnection(reader->GetProducerPort());
         #else
-            imageDataToPointSet->SetInputConnection(reader->GetOutputPort());
+        imageDataToPointSet->SetInputConnection(reader->GetOutputPort());
         #endif
         imageDataToPointSet->Update();
 
-        // Convert vtkStructuredGrid to vtkUnstructuredGrid with 
+        // Convert vtkStructuredGrid to vtkUnstructuredGrid with
         // vtkDataSetTriangleFilter.
         */
 
         // Code for converting from 
         // vtkImageData -> vtkPolyData -> vtkUnstructuredGrid.
-	    imageDataGeometryFilter = vtkSmartPointer<vtkImageDataGeometryFilter>::New();
+        imageDataGeometryFilter = vtkSmartPointer<vtkImageDataGeometryFilter>::New();
         imageDataGeometryFilter->SetInputConnection(reader->GetOutputPort());
         imageDataGeometryFilter->Update();
 
@@ -149,14 +196,14 @@ int main(int argc, char* argv[])
 
         myImageData = vtkSmartPointer<vtkPolyData>::New();
         myImageData->ShallowCopy(rotationTransformFilter->GetOutput());
-        
+
         // Consider skipping this step and just adding data to the appendFilter
         // to more directly convert to vtkUnstructuredGrid data.
-        #if VTK_MAJOR_VERSION <= 5
-            appendPolyDataFilter->AddInputConnection(myImageData->GetProducerPort());
-        #else
-            appendPolyDataFilter->AddInputData(myImageData);
-        #endif
+#if VTK_MAJOR_VERSION <= 5
+        appendPolyDataFilter->AddInputConnection(myImageData->GetProducerPort());
+#else
+        appendPolyDataFilter->AddInputData(myImageData);
+#endif
         appendPolyDataFilter->Update();
     }
 
@@ -169,106 +216,110 @@ int main(int argc, char* argv[])
     // Convert vtkPolyData to vtkUnstructuredGrid using vtkAppendFilter.
     vtkSmartPointer<vtkAppendFilter> appendFilter =
         vtkSmartPointer<vtkAppendFilter>::New();
-    #if VTK_MAJOR_VERSION <= 5
-        appendFilter->AddInput(sphereSource->GetOutput());
-    #else
-        appendFilter->AddInputData(cleanFilter->GetOutput());
-    #endif
+#if VTK_MAJOR_VERSION <= 5
+    appendFilter->AddInput(sphereSource->GetOutput());
+#else
+    appendFilter->AddInputData(cleanFilter->GetOutput());
+#endif
     appendFilter->Update();
 
-    // Triangulate the image data.    
+    /*
+    // Triangulate the image data.
     vtkSmartPointer<vtkDelaunay3D> delaunayFilter =
-        vtkSmartPointer<vtkDelaunay3D>::New();
-#if VTK_MAJOR_VERSION <= 5
+    vtkSmartPointer<vtkDelaunay3D>::New();
+    #if VTK_MAJOR_VERSION <= 5
     delaunayFilter->SetInput(triangleFilter);
-#else
+    #else
     delaunayFilter->SetInputConnection(appendFilter->GetOutputPort());
-#endif
+    #endif
     delaunayFilter->Update();
-    
+    */
 
     /*
     Sample vtkUnstructuredGrid into a uniformly sampled vtkStructuredGrid.
 
     1. Get x, y, z extents of the vtkUnstructuredGrid.
     2. Determine what spacing to use in these dimensions. Based on this
-       spacing, create a grid of points for the vtkStructuredGrid.
+    spacing, create a grid of points for the vtkStructuredGrid.
     3. Determine the value at each of these points using vtkProbeFilter
-       for interpolation.
+    for interpolation.
     */
 
     // Step 1: Get x, y, z extents of the vtkUnstructuredGrid.
-    
+
     // Cast output of appendFilter to vtkUnstructuredGrid
 
     double* bounds = cleanFilter->GetOutput()->GetBounds();
     double center[3];
-    center[0] = (bounds[0] + bounds[1]) / 2;
-    center[1] = (bounds[2] + bounds[3]) / 2;
-    center[2] = (bounds[4] + bounds[5]) / 2;
+    center[0] = (bounds[0] + bounds[1]) / 2.0;
+    center[1] = (bounds[2] + bounds[3]) / 2.0;
+    center[2] = (bounds[4] + bounds[5]) / 2.0;
 
     std::cout << std::endl << "Bounds: " << std::endl;
     std::cout << "x: (" << bounds[0] << ", " << bounds[1] << ")" << std::endl;
     std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
     std::cout << "z: (" << bounds[4] << ", " << bounds[5] << ")" << std::endl;
     //bounds[5] = -1*bounds[4]; // For some reason the extent in the Z dimension
-                           // isn't being calculated correctly...
+    // isn't being calculated correctly...
     // Step 2: Use bounds to determine locations where we can sample the 
     // vtkStructuredGrid.
-    
+
     // Determine spacing in each dimension based on bounds and grid size.
     int numXPoints = 50; // 40x40x40 grid
     int numYPoints = 50;
     int numZPoints = 50;
 
-    double spacingX = (bounds[1]-bounds[0])/(double)(numXPoints);
-    double spacingY = (bounds[3]-bounds[2])/(double)(numYPoints);
-    double spacingZ = (bounds[5]-bounds[4])/(double)(numZPoints);
+    double spacingX = (bounds[1] - bounds[0]) / (double)(numXPoints);
+    double spacingY = (bounds[3] - bounds[2]) / (double)(numYPoints);
+    double spacingZ = (bounds[5] - bounds[4]) / (double)(numZPoints);
 
     std::cout << std::endl << "Spacings: " << std::endl;
     std::cout << "x: " << spacingX << std::endl;
     std::cout << "y: " << spacingY << std::endl;
     std::cout << "z: " << spacingZ << std::endl;
 
+    /*
     // Construct vtkStructuredGrid based on this example:
     // http://www.vtk.org/Wiki/VTK/Examples/Cxx/StructuredGrid/StructuredGrid
     vtkSmartPointer<vtkStructuredGrid> structuredGrid =
-        vtkSmartPointer<vtkStructuredGrid>::New();
- 
+    vtkSmartPointer<vtkStructuredGrid>::New();
+
     vtkSmartPointer<vtkPoints> points =
-        vtkSmartPointer<vtkPoints>::New();
+    vtkSmartPointer<vtkPoints>::New();
 
     for (double k = bounds[4]; k < bounds[5]; k += spacingZ){
-        for (double j = bounds[2]; j < bounds[3]; j += spacingY){
-            for (double i = bounds[0]; i < bounds[1]; i += spacingX){
-                points->InsertNextPoint(i, j, k);
-            }
-        }
+    for (double j = bounds[2]; j < bounds[3]; j += spacingY){
+    for (double i = bounds[0]; i < bounds[1]; i += spacingX){
+    points->InsertNextPoint(i, j, k);
     }
-    
+    }
+    }
+
     structuredGrid->SetDimensions(numXPoints, numYPoints, numZPoints);
     structuredGrid->SetPoints(points);
 
-    // 3. Interpolate on the given vtkUnstructuredGrid images to compute 
+
+
+    // 3. Interpolate on the given vtkUnstructuredGrid images to compute
     // the correct value to assign each of the vtkStructuredGrid points.
-    vtkSmartPointer<vtkProbeFilter> probeFilter = 
-        vtkSmartPointer<vtkProbeFilter>::New();
+    vtkSmartPointer<vtkProbeFilter> probeFilter =
+    vtkSmartPointer<vtkProbeFilter>::New();
     probeFilter->SetSourceConnection(delaunayFilter->GetOutputPort());
-#if VTK_MAJOR_VERSION <= 5
+    #if VTK_MAJOR_VERSION <= 5
     probeFilter->SetInput(structuredGrid); // Interpolate 'Source' at these points
-#else
+    #else
     probeFilter->SetInputData(structuredGrid); // Interpolate 'Source' at these points
-#endif
+    #endif
     probeFilter->Update();
     std::cout << probeFilter->GetOutput() << std::endl;
 
-    
+
     // Triangulate structured grid before clipping.
     vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
     vtkSmartPointer<vtkDataSetTriangleFilter>::New();
-    triangleFilter->SetInputConnection(probeFilter->GetOutputPort());    
+    triangleFilter->SetInputConnection(probeFilter->GetOutputPort());
     triangleFilter->Update();
-    
+    */
 
     // Apply vtkClipDataSet filter for interpolation.    
     // Create a vtkPlane (implicit function) to interpolate over.
@@ -278,10 +329,10 @@ int main(int argc, char* argv[])
     clipPlane->SetNormal(1.0, 1.0, 0.0);
 
 
-    /*
+
     // Sample the implicit vtkPlane function so that we can
     // visualize its position relative to the image volume.
-    vtkSmartPointer<vtkSampleFunction> clipPlaneModel = 
+    vtkSmartPointer<vtkSampleFunction> clipPlaneModel =
         vtkSmartPointer<vtkSampleFunction>::New();
     clipPlaneModel->SetSampleDimensions(10, 10, 10);
     clipPlaneModel->SetImplicitFunction(clipPlane);
@@ -291,39 +342,67 @@ int main(int argc, char* argv[])
         vtkSmartPointer<vtkContourFilter>::New();
     clipPlaneContours->SetInputConnection(clipPlaneModel->GetOutputPort());
     clipPlaneContours->GenerateValues(1, 1, 1);
+
+
+    vtkSmartPointer<vtkOutlineFilter> imageVolumeOutline =
+        vtkSmartPointer<vtkOutlineFilter>::New();
+    imageVolumeOutline->SetInputConnection(appendFilter->GetOutputPort());
+
+    
+    clipPlaneWidget->SetInputData(imageVolumeOutline->GetOutput());
+    clipPlaneWidget->SetCenter(center);
+    double pointOne[3] = { center[0] + .5, center[1], center[2] + .5 };
+    double pointTwo[3] = { center[0] - .5, center[1], center[2] - .5 };
+    //clipPlaneWidget->SetPoint1(center[0] + .5, center[1], center[2] + .5);
+    //clipPlaneWidget->SetPoint2(center[0]-.5, center[1], center[2]-.5);
+    clipPlaneWidget->PlaceWidget(center[0], center[0], center[1] - 50.00, center[1] + 50.0, center[2] - 50.0, center[2] + 50.0);
+    clipPlaneWidget->SetNormal(0, 0, 1);
+    //clipPlaneWidget->SetRepresentationToOutline();
+
+    /*
+    double* outlineBounds = appendFilter->GetOutput()->GetBounds();
+    std::cout << outlineBounds[0] << " " << outlineBounds[1] << " " << outlineBounds[2] << std::endl;
+    double* origin = clipPlaneWidget->GetCenter();
+    std::cout << origin[0] << " " << origin[1] << " " << origin[2] << std::endl;
+    origin = clipPlaneWidget->GetPoint1();
+    std::cout << origin[0] << " " << origin[1] << " " << origin[2] << std::endl;
+    origin = clipPlaneWidget->GetPoint2();
+    std::cout << origin[0] << " " << origin[1] << " " << origin[2] << std::endl;
+    clipPlaneWidget->SetPoint1(center[0], bounds[2], bounds[4]);
+    clipPlaneWidget->SetPoint2(center[0], bounds[3], bounds[5]);
     */
 
-    vtkSmartPointer<vtkPlaneWidget> clipPlaneWidget =
-        vtkSmartPointer<vtkPlaneWidget>::New();
 
+    /*
     // Perform the clipping.
     vtkSmartPointer<vtkClipDataSet> clipDataSet =
-        vtkSmartPointer<vtkClipDataSet>::New();
+    vtkSmartPointer<vtkClipDataSet>::New();
     clipDataSet->SetClipFunction(clipPlane);
     clipDataSet->InsideOutOn();
 
 
-#if VTK_MAJOR_VERSION <= 5
-    probeFilter->SetInput(gridPolyData); 
+    #if VTK_MAJOR_VERSION <= 5
+    probeFilter->SetInput(gridPolyData);
     // Interpolate 'Source' at these points
-#else
+    #else
     clipDataSet->SetInputData(triangleFilter->GetOutput());
     // Interpolate 'Source' at these points
-#endif
+    #endif
     clipDataSet->Update();
-    
+    */
+
     /*
     vtkPolyData* plane = clipPlane->GetOutput();
     // Create a mapper and actor
     vtkSmartPointer<vtkPolyDataMapper> planeMapper =
-        vtkSmartPointer<vtkPolyDataMapper>::New();
-#if VTK_MAJOR_VERSION <= 5
+    vtkSmartPointer<vtkPolyDataMapper>::New();
+    #if VTK_MAJOR_VERSION <= 5
     planeMapper->SetInput(plane);
-#else
+    #else
     planeMapper->SetInputData(plane);
-#endif
+    #endif
     vtkSmartPointer<vtkActor> planeActor =
-        vtkSmartPointer<vtkActor>::New();
+    vtkSmartPointer<vtkActor>::New();
     planeActor->SetMapper(planeMapper);
     */
 
@@ -342,7 +421,7 @@ int main(int argc, char* argv[])
     // Create mapper and actor for interpolated points.
     vtkSmartPointer<vtkDataSetMapper> imageVolumeMapper =
         vtkSmartPointer<vtkDataSetMapper>::New();
-    imageVolumeMapper->SetInputConnection(probeFilter->GetOutputPort());
+    imageVolumeMapper->SetInputConnection(imageVolumeOutline->GetOutputPort());
     //gridMapper->ScalarVisibilityOff();
 
     vtkSmartPointer<vtkActor> imageVolumeActor =
@@ -355,7 +434,7 @@ int main(int argc, char* argv[])
     // Create mapper and actor for clipped image volume.
 
     // Visualization
-    
+
     // Center camera on image volume.
     vtkSmartPointer<vtkCamera> camera =
         vtkSmartPointer<vtkCamera>::New();
@@ -384,6 +463,12 @@ int main(int argc, char* argv[])
     volumeRenderer->SetBackground(.1, .2, .3); // Set background color.
     volumeRenderer->RemoveAllLights();
 
+    
+    vtkSmartPointer<KeyPressInteractorStyle> style =
+        vtkSmartPointer<KeyPressInteractorStyle>::New();
+    style->SetCurrentRenderer(volumeRenderer);
+    
+
     vtkSmartPointer<vtkRenderer> axialSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     axialSliceRenderer->SetViewport(axialViewport);
@@ -399,33 +484,30 @@ int main(int argc, char* argv[])
     sagittalSliceRenderer->SetViewport(sagittalViewport);
 
 
-    vtkSmartPointer<vtkRenderWindow> renderWindow = 
-        vtkSmartPointer<vtkRenderWindow>::New();
     renderWindow->AddRenderer(axialSliceRenderer);
     renderWindow->AddRenderer(coronalSliceRenderer);
     renderWindow->AddRenderer(sagittalSliceRenderer);
     renderWindow->AddRenderer(volumeRenderer);
 
 
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = 
+    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
         vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
-
+    renderWindowInteractor->SetInteractorStyle(style);
 
     clipPlaneWidget->SetInteractor(renderWindowInteractor);
     clipPlaneWidget->On();
-    renderWindowInteractor->Initialize();
 
 
     // Add orientation axes
-    vtkSmartPointer<vtkAxesActor> axes = 
+    vtkSmartPointer<vtkAxesActor> axes =
         vtkSmartPointer<vtkAxesActor>::New();
 
-    vtkSmartPointer<vtkOrientationMarkerWidget> widget = 
+    vtkSmartPointer<vtkOrientationMarkerWidget> widget =
         vtkSmartPointer<vtkOrientationMarkerWidget>::New();
-    widget->SetOutlineColor( 0.9300, 0.5700, 0.1300 );
+    widget->SetOutlineColor(0.9300, 0.5700, 0.1300);
     widget->SetOrientationMarker(axes);
-    widget->SetInteractor( renderWindowInteractor );
+    widget->SetInteractor(renderWindowInteractor);
     widget->SetViewport(0.0, 0.35, 0.2, 0.55); // bottom left corner of volume viewer
     widget->SetEnabled(1);
     widget->InteractiveOff();
@@ -433,6 +515,7 @@ int main(int argc, char* argv[])
     renderWindow->Render();
 
     // Start interactive window.
+    renderWindowInteractor->Initialize();
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
