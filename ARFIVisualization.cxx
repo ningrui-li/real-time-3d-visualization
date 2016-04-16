@@ -51,6 +51,10 @@
 #include <vtkCamera.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 
+// Variables holding plane position and orientation.
+double center[3];
+double* bounds;
+
 // Define image plane widget
 vtkSmartPointer<vtkPlaneWidget> clipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
 vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
@@ -71,22 +75,31 @@ public:
         // Output the key that was pressed
         std::cout << "Pressed " << key << std::endl;
 
-        // Handle an arrow key
-        if (key == "Up")
-        {
+        // Translate (with normal in +Z direction).
+        if (key == "Up" || key == "Down") {
             double* clipPlaneCenter = clipPlaneWidget->GetCenter();
-            clipPlaneCenter[2] += 1.0; // Move plane in the direction of its normal (+Z)
-            std::cout << clipPlaneCenter[0] << " " << clipPlaneCenter[1] << " " << clipPlaneCenter[2] << std::endl;
+            double* clipPlaneNormal = clipPlaneWidget->GetNormal();
+
+            if (key == "Up")
+                clipPlaneCenter[2] += 1.0; // Translate plane in the direction of its normal (+Z)
+            else
+                clipPlaneCenter[2] -= 1.0; // Translate plane in the direction of its normal (-Z)
+
+            // Check to make sure clip plane is within bounds.
+            double zAxisLowerBound = bounds[4];
+            double zAxisUpperBound = bounds[5];
+            if (clipPlaneCenter[2] < zAxisLowerBound)
+                clipPlaneCenter[2] = zAxisLowerBound;
+            if (clipPlaneCenter[2] > zAxisUpperBound)
+                clipPlaneCenter[2] = zAxisUpperBound;
+
             clipPlaneWidget->SetCenter(clipPlaneCenter);
+            clipPlaneWidget->PlaceWidget(clipPlaneCenter[0], clipPlaneCenter[0], 
+                                         clipPlaneCenter[1] - 50.00, clipPlaneCenter[1] + 50.0, 
+                                         clipPlaneCenter[2] - 50.0, clipPlaneCenter[2] + 50.0);
+            clipPlaneWidget->SetNormal(0, 0, 1);
             renderWindow->Render();
         }
-
-        // Handle a "normal" key
-        if (key == "a")
-        {
-            std::cout << "The a key was pressed." << std::endl;
-        }
-
         // Forward events
         vtkInteractorStyleTrackballCamera::OnKeyPress();
     }
@@ -249,8 +262,7 @@ int main(int argc, char* argv[])
 
     // Cast output of appendFilter to vtkUnstructuredGrid
 
-    double* bounds = cleanFilter->GetOutput()->GetBounds();
-    double center[3];
+    bounds = cleanFilter->GetOutput()->GetBounds();
     center[0] = (bounds[0] + bounds[1]) / 2.0;
     center[1] = (bounds[2] + bounds[3]) / 2.0;
     center[2] = (bounds[4] + bounds[5]) / 2.0;
