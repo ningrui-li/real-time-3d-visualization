@@ -346,24 +346,8 @@ int main(int argc, char* argv[])
     clipPlaneWidget->SetCenter(center);
     double pointOne[3] = { center[0] + .5, center[1], center[2] + .5 };
     double pointTwo[3] = { center[0] - .5, center[1], center[2] - .5 };
-    //clipPlaneWidget->SetPoint1(center[0] + .5, center[1], center[2] + .5);
-    //clipPlaneWidget->SetPoint2(center[0]-.5, center[1], center[2]-.5);
     clipPlaneWidget->PlaceWidget(center[0], center[0], center[1] - 50.00, center[1] + 50.0, center[2] - 50.0, center[2] + 50.0);
     clipPlaneWidget->SetNormal(0, 0, 1);
-    //clipPlaneWidget->SetRepresentationToOutline();
-
-    /*
-    double* outlineBounds = appendFilter->GetOutput()->GetBounds();
-    std::cout << outlineBounds[0] << " " << outlineBounds[1] << " " << outlineBounds[2] << std::endl;
-    double* origin = clipPlaneWidget->GetCenter();
-    std::cout << origin[0] << " " << origin[1] << " " << origin[2] << std::endl;
-    origin = clipPlaneWidget->GetPoint1();
-    std::cout << origin[0] << " " << origin[1] << " " << origin[2] << std::endl;
-    origin = clipPlaneWidget->GetPoint2();
-    std::cout << origin[0] << " " << origin[1] << " " << origin[2] << std::endl;
-    clipPlaneWidget->SetPoint1(center[0], bounds[2], bounds[4]);
-    clipPlaneWidget->SetPoint2(center[0], bounds[3], bounds[5]);
-    */
 
 
     // Perform the clipping.
