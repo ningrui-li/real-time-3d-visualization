@@ -7,6 +7,7 @@
 #include <vtkRenderer.h>
 #include <vtkActor.h>
 #include <vtkObjectFactory.h>
+#include <vtkProperty.h>
 
 // For reading in images
 #include <vtkSmartPointer.h>
@@ -274,9 +275,9 @@ int main(int argc, char* argv[])
     // vtkStructuredGrid.
 
     // Determine spacing in each dimension based on bounds and grid size.
-    int numXPoints = 50; // 40x40x40 grid
-    int numYPoints = 50;
-    int numZPoints = 50;
+    int numXPoints = 10;
+    int numYPoints = 10;
+    int numZPoints = 10;
 
     double spacingX = (bounds[1] - bounds[0]) / (double)(numXPoints);
     double spacingY = (bounds[3] - bounds[2]) / (double)(numYPoints);
@@ -334,28 +335,14 @@ int main(int argc, char* argv[])
     clipPlane->SetOrigin(0.0, 0.0, 0.0);
     clipPlane->SetNormal(0.0, 0.0, 1.0);
 
-
-
-    // Sample the implicit vtkPlane function so that we can
-    // visualize its position relative to the image volume.
-    vtkSmartPointer<vtkSampleFunction> clipPlaneModel =
-        vtkSmartPointer<vtkSampleFunction>::New();
-    clipPlaneModel->SetSampleDimensions(10, 10, 10);
-    clipPlaneModel->SetImplicitFunction(clipPlane);
-    clipPlaneModel->SetModelBounds(bounds);
-
-    vtkSmartPointer<vtkContourFilter> clipPlaneContours =
-        vtkSmartPointer<vtkContourFilter>::New();
-    clipPlaneContours->SetInputConnection(clipPlaneModel->GetOutputPort());
-    clipPlaneContours->GenerateValues(1, 1, 1);
-
-
     vtkSmartPointer<vtkOutlineFilter> imageVolumeOutline =
         vtkSmartPointer<vtkOutlineFilter>::New();
     imageVolumeOutline->SetInputConnection(appendFilter->GetOutputPort());
 
     
     clipPlaneWidget->SetInputData(imageVolumeOutline->GetOutput());
+    clipPlaneWidget->SetHandleSize(0.0001);
+    clipPlaneWidget->GetPlaneProperty()->SetColor(0.0, 0.0, 1.0);
     clipPlaneWidget->SetCenter(center);
     double pointOne[3] = { center[0] + .5, center[1], center[2] + .5 };
     double pointTwo[3] = { center[0] - .5, center[1], center[2] - .5 };
