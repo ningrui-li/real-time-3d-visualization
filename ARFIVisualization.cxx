@@ -67,6 +67,12 @@ vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>
 vtkSmartPointer<vtkPlane> sagittalClipPlane = vtkSmartPointer<vtkPlane>::New();
 vtkSmartPointer<vtkClipDataSet> sagittalClipDataSet = vtkSmartPointer<vtkClipDataSet>::New();
 
+vtkSmartPointer<vtkPlane> axialClipPlane = vtkSmartPointer<vtkPlane>::New();
+vtkSmartPointer<vtkClipDataSet> axialClipDataSet = vtkSmartPointer<vtkClipDataSet>::New();
+
+vtkSmartPointer<vtkPlane> coronalClipPlane = vtkSmartPointer<vtkPlane>::New();
+vtkSmartPointer<vtkClipDataSet> coronalClipDataSet = vtkSmartPointer<vtkClipDataSet>::New();
+
 
 // Define interaction style
 class KeyPressInteractorStyle : public vtkInteractorStyleTrackballCamera
@@ -291,7 +297,6 @@ int main(int argc, char* argv[])
     std::cout << "y: " << spacingY << std::endl;
     std::cout << "z: " << spacingZ << std::endl;
 
-    
     // Construct vtkStructuredGrid based on this example:
     // http://www.vtk.org/Wiki/VTK/Examples/Cxx/StructuredGrid/StructuredGrid
     vtkSmartPointer<vtkStructuredGrid> structuredGrid =
@@ -324,7 +329,7 @@ int main(int argc, char* argv[])
 #endif
     probeFilter->Update();
     std::cout << probeFilter->GetOutput() << std::endl;
-
+    
 
     // Triangulate structured grid before clipping.
     vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
@@ -338,58 +343,107 @@ int main(int argc, char* argv[])
     sagittalClipPlane->SetOrigin(0.0, 0.0, 0.0);
     sagittalClipPlane->SetNormal(0.0, 0.0, 1.0);
 
+    axialClipPlane->SetOrigin(0.0, 0.0, 0.0);
+    axialClipPlane->SetNormal(0.0, 1.0, 0.0);
+    
+    coronalClipPlane->SetOrigin(0.0, 0.0, 0.0);
+    coronalClipPlane->SetNormal(1.0, 0.0, 0.0);
+
     vtkSmartPointer<vtkOutlineFilter> imageVolumeOutline =
         vtkSmartPointer<vtkOutlineFilter>::New();
     imageVolumeOutline->SetInputConnection(appendFilter->GetOutputPort());
 
     
+    // I have no idea how the PlaceWidget() function works. I placed the
+    // planes using the guess-and-check method.
+    double height = bounds[5] - bounds[4];
+    double width = bounds[3] - bounds[2];
+    double length = bounds[1] - bounds[0];
+
     sagittalClipPlaneWidget->SetInputData(imageVolumeOutline->GetOutput());
     sagittalClipPlaneWidget->SetHandleSize(0.0001);
     sagittalClipPlaneWidget->GetPlaneProperty()->SetColor(0.0, 0.0, 1.0);
     sagittalClipPlaneWidget->SetCenter(center);
-    sagittalClipPlaneWidget->PlaceWidget(center[0], center[0], center[1] - 50.00, center[1] + 50.0, center[2] - 50.0, center[2] + 50.0);
+    sagittalClipPlaneWidget->PlaceWidget(center[0], center[0], 
+        center[1] - width, center[1] + width, 
+        center[2] - length, center[2] + length);
     sagittalClipPlaneWidget->SetNormal(0, 0, 1);
 
+    axialClipPlaneWidget->SetInputData(imageVolumeOutline->GetOutput());
+    axialClipPlaneWidget->SetHandleSize(0.0001);
+    axialClipPlaneWidget->GetPlaneProperty()->SetColor(0.0, 1.0, 0.0);
+    axialClipPlaneWidget->SetCenter(center);
+    axialClipPlaneWidget->PlaceWidget(center[0], center[0], 
+        center[1] - width, center[1] + width, 
+        center[2] - height, center[2] + height);
+    axialClipPlaneWidget->SetNormal(0, 1, 0);
 
-    // Perform the clipping.
-    sagittalClipDataSet->SetClipFunction(sagittalClipPlane);
-
- #if VTK_MAJOR_VERSION <= 5
-    probeFilter->SetInput(gridPolyData);
-    // Interpolate 'Source' at these points
-#else
-    sagittalClipDataSet->SetInputData(triangleFilter->GetOutput());
-    // Interpolate 'Source' at these points
-#endif
-    sagittalClipDataSet->Update();
+    coronalClipPlaneWidget->SetInputData(imageVolumeOutline->GetOutput());
+    coronalClipPlaneWidget->SetHandleSize(0.0001);
+    coronalClipPlaneWidget->GetPlaneProperty()->SetColor(1.0, 0.0, 0.0);
+    coronalClipPlaneWidget->SetCenter(center);
+    coronalClipPlaneWidget->PlaceWidget(center[0], center[0], 
+        center[1] - length, center[1] + length,
+        center[2] - height, center[2] + height);
+    coronalClipPlaneWidget->SetNormal(1, 0, 0);
 
     
+    // Perform the clipping.
+    sagittalClipDataSet->SetClipFunction(sagittalClipPlane);
+    axialClipDataSet->SetClipFunction(axialClipPlane);
+    coronalClipDataSet->SetClipFunction(coronalClipPlane);
+
     /*
-    vtkPolyData* plane = clipPlane->GetOutput();
-    // Create a mapper and actor
-    vtkSmartPointer<vtkPolyDataMapper> planeMapper =
-    vtkSmartPointer<vtkPolyDataMapper>::New();
-    #if VTK_MAJOR_VERSION <= 5
-    planeMapper->SetInput(plane);
-    #else
-    planeMapper->SetInputData(plane);
-    #endif
-    vtkSmartPointer<vtkActor> planeActor =
-    vtkSmartPointer<vtkActor>::New();
-    planeActor->SetMapper(planeMapper);
+ #if VTK_MAJOR_VERSION <= 5
+    sagittalClipDataSet->SetInput(triangleFilter->GetOutput());
+    axialClipDataSet->SetInput(triangleFilter->GetOutput());
+    coronalClipDataSet->SetInput(triangleFilter->GetOutput());
+#else
+    sagittalClipDataSet->SetInputData(triangleFilter->GetOutput());
+    axialClipDataSet->SetInputData(triangleFilter->GetOutput());
+    coronalClipDataSet->SetInputData(triangleFilter->GetOutput());
+#endif
+    sagittalClipDataSet->Update();
+    axialClipDataSet->Update();
+    coronalClipDataSet->Update();
     */
 
     // Create mapper and actor for clipped image volume.
-    vtkSmartPointer<vtkDataSetMapper> clippedVolumeMapper =
+    vtkSmartPointer<vtkDataSetMapper> sagittalClippedVolumeMapper =
         vtkSmartPointer<vtkDataSetMapper>::New();
 #if VTK_MAJOR_VERSION <= 5
-    clippedVolumeMapper->SetInputConnection(unstructuredGrid->GetProducerPort());
+    sagittalClippedVolumeMapper->SetInputConnection(unstructuredGrid->GetProducerPort());
 #else
-    clippedVolumeMapper->SetInputData(sagittalClipDataSet->GetOutput());
+    sagittalClippedVolumeMapper->SetInputData(sagittalClipDataSet->GetOutput());
 #endif
-    vtkSmartPointer<vtkActor> clippedVolumeActor =
+    vtkSmartPointer<vtkActor> sagittalClippedVolumeActor =
         vtkSmartPointer<vtkActor>::New();
-    clippedVolumeActor->SetMapper(clippedVolumeMapper);
+    sagittalClippedVolumeActor->SetMapper(sagittalClippedVolumeMapper);
+
+
+    vtkSmartPointer<vtkDataSetMapper> axialClippedVolumeMapper =
+        vtkSmartPointer<vtkDataSetMapper>::New();
+#if VTK_MAJOR_VERSION <= 5
+    axialClippedVolumeMapper->SetInputConnection(unstructuredGrid->GetProducerPort());
+#else
+    axialClippedVolumeMapper->SetInputData(axialClipDataSet->GetOutput());
+#endif
+    vtkSmartPointer<vtkActor> axialClippedVolumeActor =
+        vtkSmartPointer<vtkActor>::New();
+    axialClippedVolumeActor->SetMapper(axialClippedVolumeMapper);
+
+
+    vtkSmartPointer<vtkDataSetMapper> coronalClippedVolumeMapper =
+        vtkSmartPointer<vtkDataSetMapper>::New();
+#if VTK_MAJOR_VERSION <= 5
+    coronalClippedVolumeMapper->SetInputConnection(unstructuredGrid->GetProducerPort());
+#else
+    coronalClippedVolumeMapper->SetInputData(coronalClipDataSet->GetOutput());
+#endif
+    vtkSmartPointer<vtkActor> coronalClippedVolumeActor =
+        vtkSmartPointer<vtkActor>::New();
+    coronalClippedVolumeActor->SetMapper(coronalClippedVolumeMapper);
+
 
     // Create mapper and actor for image volume outline.
     vtkSmartPointer<vtkDataSetMapper> imageVolumeMapper =
@@ -441,18 +495,20 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkRenderer> axialSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     axialSliceRenderer->SetViewport(axialViewport);
-    axialSliceRenderer->AddActor(clippedVolumeActor);
+    axialSliceRenderer->AddActor(axialClippedVolumeActor);
     axialSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
     vtkSmartPointer<vtkRenderer> coronalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     coronalSliceRenderer->SetViewport(coronalViewport);
+    axialSliceRenderer->AddActor(coronalClippedVolumeActor);
     coronalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
 
     vtkSmartPointer<vtkRenderer> sagittalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     sagittalSliceRenderer->SetViewport(sagittalViewport);
+    axialSliceRenderer->AddActor(sagittalClippedVolumeActor);
     coronalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
 
@@ -470,6 +526,11 @@ int main(int argc, char* argv[])
     sagittalClipPlaneWidget->SetInteractor(renderWindowInteractor);
     sagittalClipPlaneWidget->On();
 
+    axialClipPlaneWidget->SetInteractor(renderWindowInteractor);
+    axialClipPlaneWidget->On();    
+    
+    coronalClipPlaneWidget->SetInteractor(renderWindowInteractor);
+    coronalClipPlaneWidget->On();
 
     // Add orientation axes
     vtkSmartPointer<vtkAxesActor> axes =
