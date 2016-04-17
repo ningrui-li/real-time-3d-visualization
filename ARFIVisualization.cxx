@@ -402,16 +402,6 @@ int main(int argc, char* argv[])
     
 
     // Apply vtkClipDataSet filter for interpolation.    
-    // Create a vtkPlane (implicit function) to interpolate over.
-    sagittalClipPlane->SetOrigin(0.0, 0.0, 0.0);
-    sagittalClipPlane->SetNormal(0.0, 0.0, 1.0);
-
-    axialClipPlane->SetOrigin(0.0, 0.0, 0.0);
-    axialClipPlane->SetNormal(0.0, 1.0, 0.0);
-    
-    coronalClipPlane->SetOrigin(0.0, 0.0, 0.0);
-    coronalClipPlane->SetNormal(1.0, 0.0, 0.0);
-
     vtkSmartPointer<vtkOutlineFilter> imageVolumeOutline =
         vtkSmartPointer<vtkOutlineFilter>::New();
     imageVolumeOutline->SetInputConnection(appendFilter->GetOutputPort());
@@ -450,11 +440,16 @@ int main(int argc, char* argv[])
         center[2] - height, center[2] + height);
     coronalClipPlaneWidget->SetNormal(1, 0, 0);
 
-    
-    // Perform the clipping.
-    sagittalClipDataSet->SetClipFunction(sagittalClipPlane);
-    axialClipDataSet->SetClipFunction(axialClipPlane);
-    coronalClipDataSet->SetClipFunction(coronalClipPlane);
+    // Create a vtkPlane (implicit function) to interpolate over.
+    sagittalClipPlane->SetOrigin(0.0, 0.0, 0.0);
+    sagittalClipPlane->SetNormal(0.0, 0.0, 1.0);
+
+    axialClipPlane->SetOrigin(0.0, 0.0, 0.0);
+    axialClipPlane->SetNormal(0.0, 1.0, 0.0);
+
+    coronalClipPlane->SetOrigin(0.0, 0.0, 0.0);
+    coronalClipPlane->SetNormal(1.0, 0.0, 0.0);
+
 
     
  #if VTK_MAJOR_VERSION <= 5
@@ -466,6 +461,16 @@ int main(int argc, char* argv[])
     axialClipDataSet->SetInputData(triangleFilter->GetOutput());
     coronalClipDataSet->SetInputData(triangleFilter->GetOutput());
 #endif
+
+    // Perform the clipping.
+    sagittalClipPlaneWidget->GetPlane(sagittalClipPlane);
+    axialClipPlaneWidget->GetPlane(axialClipPlane);
+    coronalClipPlaneWidget->GetPlane(coronalClipPlane);
+
+    sagittalClipDataSet->SetClipFunction(sagittalClipPlane);
+    axialClipDataSet->SetClipFunction(axialClipPlane);
+    coronalClipDataSet->SetClipFunction(coronalClipPlane);
+
     sagittalClipDataSet->Update();
     axialClipDataSet->Update();
     coronalClipDataSet->Update();
@@ -579,22 +584,22 @@ int main(int argc, char* argv[])
     axialSliceRenderer->SetViewport(axialViewport);
     axialSliceRenderer->SetActiveCamera(axialSliceCamera);
     axialSliceRenderer->AddActor(axialClippedVolumeActor);
-    axialSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
+    axialSliceRenderer->SetBackground(.1, .3, .1); // Set background color.
 
     vtkSmartPointer<vtkRenderer> coronalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     coronalSliceRenderer->SetViewport(coronalViewport);
     coronalSliceRenderer->SetActiveCamera(coronalSliceCamera);
     coronalSliceRenderer->AddActor(coronalClippedVolumeActor);
-    coronalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
+    coronalSliceRenderer->SetBackground(.3, .1, .1); // Set background color.
 
 
     vtkSmartPointer<vtkRenderer> sagittalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     sagittalSliceRenderer->SetViewport(sagittalViewport);
-    sagittalSliceRenderer->SetActiveCamera(sagittalSliceCamera);
+    //sagittalSliceRenderer->SetActiveCamera(sagittalSliceCamera);
     sagittalSliceRenderer->AddActor(sagittalClippedVolumeActor);
-    sagittalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
+    sagittalSliceRenderer->SetBackground(.1, .1, .3); // Set background color.
 
 
     renderWindow->AddRenderer(axialSliceRenderer);
