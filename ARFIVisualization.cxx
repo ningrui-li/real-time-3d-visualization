@@ -57,12 +57,15 @@ double center[3];
 double* bounds;
 
 // Define image plane widget
-vtkSmartPointer<vtkPlaneWidget> clipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
+vtkSmartPointer<vtkPlaneWidget> sagittalClipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
+vtkSmartPointer<vtkPlaneWidget> axialClipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
+vtkSmartPointer<vtkPlaneWidget> coronalClipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
+
 vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
 
 // Define clipping filter
-vtkSmartPointer<vtkPlane> clipPlane = vtkSmartPointer<vtkPlane>::New();
-vtkSmartPointer<vtkClipDataSet> clipDataSet = vtkSmartPointer<vtkClipDataSet>::New();
+vtkSmartPointer<vtkPlane> sagittalClipPlane = vtkSmartPointer<vtkPlane>::New();
+vtkSmartPointer<vtkClipDataSet> sagittalClipDataSet = vtkSmartPointer<vtkClipDataSet>::New();
 
 
 // Define interaction style
@@ -83,35 +86,35 @@ public:
 
         // Translate (with normal in +Z direction).
         if (key == "Up" || key == "Down") {
-            double* clipPlaneCenter = clipPlaneWidget->GetCenter();
-            double* clipPlaneNormal = clipPlaneWidget->GetNormal();
+            double* sagittalClipPlaneCenter = sagittalClipPlaneWidget->GetCenter();
+            double* sagittalClipPlaneNormal = sagittalClipPlaneWidget->GetNormal();
 
             if (key == "Up")
-                clipPlaneCenter[2] += 1.0; // Translate plane in the direction of its normal (+Z)
+                sagittalClipPlaneCenter[2] += 1.0; // Translate plane in the direction of its normal (+Z)
             else
-                clipPlaneCenter[2] -= 1.0; // Translate plane in the direction of its normal (-Z)
+                sagittalClipPlaneCenter[2] -= 1.0; // Translate plane in the direction of its normal (-Z)
 
             // Check to make sure clip plane is within bounds.
             double zAxisLowerBound = bounds[4];
             double zAxisUpperBound = bounds[5];
-            if (clipPlaneCenter[2] < zAxisLowerBound)
-                clipPlaneCenter[2] = zAxisLowerBound;
-            if (clipPlaneCenter[2] > zAxisUpperBound)
-                clipPlaneCenter[2] = zAxisUpperBound;
+            if (sagittalClipPlaneCenter[2] < zAxisLowerBound)
+                sagittalClipPlaneCenter[2] = zAxisLowerBound;
+            if (sagittalClipPlaneCenter[2] > zAxisUpperBound)
+                sagittalClipPlaneCenter[2] = zAxisUpperBound;
 
-            clipPlaneWidget->SetCenter(clipPlaneCenter);
-            clipPlaneWidget->PlaceWidget(clipPlaneCenter[0], clipPlaneCenter[0], 
-                                         clipPlaneCenter[1] - 50.00, clipPlaneCenter[1] + 50.0, 
-                                         clipPlaneCenter[2] - 50.0, clipPlaneCenter[2] + 50.0);
-            clipPlaneWidget->SetNormal(0, 0, 1);
+            sagittalClipPlaneWidget->SetCenter(sagittalClipPlaneCenter);
+            sagittalClipPlaneWidget->PlaceWidget(sagittalClipPlaneCenter[0], sagittalClipPlaneCenter[0],
+                sagittalClipPlaneCenter[1] - 50.0, sagittalClipPlaneCenter[1] + 50.0,
+                sagittalClipPlaneCenter[2] - 50.0, sagittalClipPlaneCenter[2] + 50.0);
+            sagittalClipPlaneWidget->SetNormal(0, 0, 1);
 
             renderWindow->Render();
         }
 
         if (key == "space") {
-            clipPlaneWidget->GetPlane(clipPlane);
-            clipDataSet->SetClipFunction(clipPlane);
-            clipDataSet->Update();
+            sagittalClipPlaneWidget->GetPlane(sagittalClipPlane);
+            sagittalClipDataSet->SetClipFunction(sagittalClipPlane);
+            sagittalClipDataSet->Update();
 
             renderWindow->Render();
         }
@@ -332,35 +335,33 @@ int main(int argc, char* argv[])
 
     // Apply vtkClipDataSet filter for interpolation.    
     // Create a vtkPlane (implicit function) to interpolate over.
-    clipPlane->SetOrigin(0.0, 0.0, 0.0);
-    clipPlane->SetNormal(0.0, 0.0, 1.0);
+    sagittalClipPlane->SetOrigin(0.0, 0.0, 0.0);
+    sagittalClipPlane->SetNormal(0.0, 0.0, 1.0);
 
     vtkSmartPointer<vtkOutlineFilter> imageVolumeOutline =
         vtkSmartPointer<vtkOutlineFilter>::New();
     imageVolumeOutline->SetInputConnection(appendFilter->GetOutputPort());
 
     
-    clipPlaneWidget->SetInputData(imageVolumeOutline->GetOutput());
-    clipPlaneWidget->SetHandleSize(0.0001);
-    clipPlaneWidget->GetPlaneProperty()->SetColor(0.0, 0.0, 1.0);
-    clipPlaneWidget->SetCenter(center);
-    double pointOne[3] = { center[0] + .5, center[1], center[2] + .5 };
-    double pointTwo[3] = { center[0] - .5, center[1], center[2] - .5 };
-    clipPlaneWidget->PlaceWidget(center[0], center[0], center[1] - 50.00, center[1] + 50.0, center[2] - 50.0, center[2] + 50.0);
-    clipPlaneWidget->SetNormal(0, 0, 1);
+    sagittalClipPlaneWidget->SetInputData(imageVolumeOutline->GetOutput());
+    sagittalClipPlaneWidget->SetHandleSize(0.0001);
+    sagittalClipPlaneWidget->GetPlaneProperty()->SetColor(0.0, 0.0, 1.0);
+    sagittalClipPlaneWidget->SetCenter(center);
+    sagittalClipPlaneWidget->PlaceWidget(center[0], center[0], center[1] - 50.00, center[1] + 50.0, center[2] - 50.0, center[2] + 50.0);
+    sagittalClipPlaneWidget->SetNormal(0, 0, 1);
 
 
     // Perform the clipping.
-    clipDataSet->SetClipFunction(clipPlane);
+    sagittalClipDataSet->SetClipFunction(sagittalClipPlane);
 
  #if VTK_MAJOR_VERSION <= 5
     probeFilter->SetInput(gridPolyData);
     // Interpolate 'Source' at these points
 #else
-    clipDataSet->SetInputData(triangleFilter->GetOutput());
+    sagittalClipDataSet->SetInputData(triangleFilter->GetOutput());
     // Interpolate 'Source' at these points
 #endif
-    clipDataSet->Update();
+    sagittalClipDataSet->Update();
 
     
     /*
@@ -384,7 +385,7 @@ int main(int argc, char* argv[])
 #if VTK_MAJOR_VERSION <= 5
     clippedVolumeMapper->SetInputConnection(unstructuredGrid->GetProducerPort());
 #else
-    clippedVolumeMapper->SetInputData(clipDataSet->GetOutput());
+    clippedVolumeMapper->SetInputData(sagittalClipDataSet->GetOutput());
 #endif
     vtkSmartPointer<vtkActor> clippedVolumeActor =
         vtkSmartPointer<vtkActor>::New();
@@ -428,7 +429,7 @@ int main(int argc, char* argv[])
     volumeRenderer->SetViewport(volumeViewport);
 
     volumeRenderer->AddActor(imageVolumeActor);
-    volumeRenderer->SetBackground(.1, .2, .3); // Set background color.
+    volumeRenderer->SetBackground(.5, .5, .5); // Set background color.
     volumeRenderer->RemoveAllLights();
 
     
@@ -446,10 +447,13 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkRenderer> coronalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     coronalSliceRenderer->SetViewport(coronalViewport);
+    coronalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
+
 
     vtkSmartPointer<vtkRenderer> sagittalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     sagittalSliceRenderer->SetViewport(sagittalViewport);
+    coronalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
 
     renderWindow->AddRenderer(axialSliceRenderer);
@@ -463,8 +467,8 @@ int main(int argc, char* argv[])
     renderWindowInteractor->SetRenderWindow(renderWindow);
     renderWindowInteractor->SetInteractorStyle(style);
 
-    clipPlaneWidget->SetInteractor(renderWindowInteractor);
-    clipPlaneWidget->On();
+    sagittalClipPlaneWidget->SetInteractor(renderWindowInteractor);
+    sagittalClipPlaneWidget->On();
 
 
     // Add orientation axes
