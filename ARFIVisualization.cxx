@@ -55,6 +55,9 @@
 // Variables holding plane position and orientation.
 double center[3];
 double* bounds;
+double width;
+double height;
+double length;
 
 // Define image plane widget
 vtkSmartPointer<vtkPlaneWidget> sagittalClipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
@@ -110,9 +113,61 @@ public:
 
             sagittalClipPlaneWidget->SetCenter(sagittalClipPlaneCenter);
             sagittalClipPlaneWidget->PlaceWidget(sagittalClipPlaneCenter[0], sagittalClipPlaneCenter[0],
-                sagittalClipPlaneCenter[1] - 50.0, sagittalClipPlaneCenter[1] + 50.0,
-                sagittalClipPlaneCenter[2] - 50.0, sagittalClipPlaneCenter[2] + 50.0);
+                sagittalClipPlaneCenter[1] - width, sagittalClipPlaneCenter[1] + width,
+                sagittalClipPlaneCenter[2] - length, sagittalClipPlaneCenter[2] + length);
             sagittalClipPlaneWidget->SetNormal(0, 0, 1);
+
+            renderWindow->Render();
+        }
+
+        if (key == "Left" || key == "Right") {
+            double* axialClipPlaneCenter = axialClipPlaneWidget->GetCenter();
+            double* axialClipPlaneNormal = axialClipPlaneWidget->GetNormal();
+
+            if (key == "Right")
+                axialClipPlaneCenter[1] += 1.0; // Translate plane in the direction of its normal (+Y)
+            else
+                axialClipPlaneCenter[1] -= 1.0; // Translate plane in the direction of its normal (-Y)
+
+            // Check to make sure clip plane is within bounds.
+            double yAxisLowerBound = bounds[2];
+            double yAxisUpperBound = bounds[3];
+            if (axialClipPlaneCenter[1] < yAxisLowerBound)
+                axialClipPlaneCenter[1] = yAxisLowerBound;
+            if (axialClipPlaneCenter[1] > yAxisUpperBound)
+                axialClipPlaneCenter[1] = yAxisUpperBound;
+
+            axialClipPlaneWidget->SetCenter(axialClipPlaneCenter);
+            axialClipPlaneWidget->PlaceWidget(axialClipPlaneCenter[0], axialClipPlaneCenter[0],
+                axialClipPlaneCenter[1] - width, axialClipPlaneCenter[1] + width,
+                axialClipPlaneCenter[2] - height, axialClipPlaneCenter[2] + height);
+            axialClipPlaneWidget->SetNormal(0, 1, 0);
+
+            renderWindow->Render();
+        }
+
+        if (key == "a" || key == "z") {
+            double* coronalClipPlaneCenter = coronalClipPlaneWidget->GetCenter();
+            double* coronalClipPlaneNormal = coronalClipPlaneWidget->GetNormal();
+
+            if (key == "a")
+                coronalClipPlaneCenter[0] += 1.0; // Translate plane in the direction of its normal (+X)
+            else
+                coronalClipPlaneCenter[0] -= 1.0; // Translate plane in the direction of its normal (-X)
+
+                                                // Check to make sure clip plane is within bounds.
+            double xAxisLowerBound = bounds[0];
+            double xAxisUpperBound = bounds[1];
+            if (coronalClipPlaneCenter[0] < xAxisLowerBound)
+                coronalClipPlaneCenter[0] = xAxisLowerBound;
+            if (coronalClipPlaneCenter[0] > xAxisUpperBound)
+                coronalClipPlaneCenter[0] = xAxisUpperBound;
+
+            coronalClipPlaneWidget->SetCenter(coronalClipPlaneCenter);
+            coronalClipPlaneWidget->PlaceWidget(coronalClipPlaneCenter[0], coronalClipPlaneCenter[0],
+                coronalClipPlaneCenter[1] - length, coronalClipPlaneCenter[1] + length,
+                coronalClipPlaneCenter[2] - height, coronalClipPlaneCenter[2] + height);
+            coronalClipPlaneWidget->SetNormal(1, 0, 0);
 
             renderWindow->Render();
         }
@@ -121,6 +176,14 @@ public:
             sagittalClipPlaneWidget->GetPlane(sagittalClipPlane);
             sagittalClipDataSet->SetClipFunction(sagittalClipPlane);
             sagittalClipDataSet->Update();
+
+            axialClipPlaneWidget->GetPlane(axialClipPlane);
+            axialClipDataSet->SetClipFunction(axialClipPlane);
+            axialClipDataSet->Update();
+
+            coronalClipPlaneWidget->GetPlane(coronalClipPlane);
+            coronalClipDataSet->SetClipFunction(coronalClipPlane);
+            coronalClipDataSet->Update();
 
             renderWindow->Render();
         }
@@ -356,9 +419,9 @@ int main(int argc, char* argv[])
     
     // I have no idea how the PlaceWidget() function works. I placed the
     // planes using the guess-and-check method.
-    double height = bounds[5] - bounds[4];
-    double width = bounds[3] - bounds[2];
-    double length = bounds[1] - bounds[0];
+    height = bounds[5] - bounds[4];
+    width = bounds[3] - bounds[2];
+    length = bounds[1] - bounds[0];
 
     sagittalClipPlaneWidget->SetInputData(imageVolumeOutline->GetOutput());
     sagittalClipPlaneWidget->SetHandleSize(0.0001);
