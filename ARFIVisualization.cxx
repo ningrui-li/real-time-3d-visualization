@@ -164,24 +164,7 @@ int main(int argc, char* argv[])
         // Read in image data as vtkImageData.
         reader = vtkSmartPointer<vtkJPEGReader>::New();
         reader->SetFileName(imageFileName.c_str());
-
-        /*
-        // Code for converting from
-        // vtkImageData -> vtkStructuredGrid -> vtkUnstructuredGrid.
-
-        // Convert vtkImageData to vtkStructuredGrid.
-        vtkSmartPointer<vtkImageDataToPointSet> imageDataToPointSet =
-        vtkSmartPointer<vtkImageDataToPointSet>::New();
-        #if VTK_MAJOR_VERSION <= 5
-        imageDataToPointSet->SetInputConnection(reader->GetProducerPort());
-        #else
-        imageDataToPointSet->SetInputConnection(reader->GetOutputPort());
-        #endif
-        imageDataToPointSet->Update();
-
-        // Convert vtkStructuredGrid to vtkUnstructuredGrid with
-        // vtkDataSetTriangleFilter.
-        */
+        
 
         // Code for converting from 
         // vtkImageData -> vtkPolyData -> vtkUnstructuredGrid.
