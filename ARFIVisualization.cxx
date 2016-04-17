@@ -347,9 +347,9 @@ int main(int argc, char* argv[])
     // vtkStructuredGrid.
 
     // Determine spacing in each dimension based on bounds and grid size.
-    int numXPoints = 10;
-    int numYPoints = 10;
-    int numZPoints = 10;
+    int numXPoints = 50;
+    int numYPoints = 50;
+    int numZPoints = 50;
 
     double spacingX = (bounds[1] - bounds[0]) / (double)(numXPoints);
     double spacingY = (bounds[3] - bounds[2]) / (double)(numYPoints);
