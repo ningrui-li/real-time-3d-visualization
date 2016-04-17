@@ -520,12 +520,31 @@ int main(int argc, char* argv[])
     //gridActor->GetProperty()->SetColor(0.0, 0.0, 1.0); //(R,G,B)
     //gridActor->GetProperty()->SetPointSize(3);
 
-    // Visualization
+    // Visualization.
     // Center camera on image volume.
-    vtkSmartPointer<vtkCamera> camera =
+    vtkSmartPointer<vtkCamera> imageVolumeCamera =
         vtkSmartPointer<vtkCamera>::New();
-    camera->SetPosition(0, -60, 0);
-    camera->SetFocalPoint(center);
+    imageVolumeCamera->SetPosition(0, -60, 0);
+    imageVolumeCamera->SetFocalPoint(center);
+
+    // Camera for .
+    vtkSmartPointer<vtkCamera> sagittalSliceCamera =
+        vtkSmartPointer<vtkCamera>::New();
+    sagittalSliceCamera->SetFocalPoint(center);
+    sagittalSliceCamera->SetPosition(0, 0, -60);
+
+    // Center camera on image volume.
+    vtkSmartPointer<vtkCamera> axialSliceCamera =
+        vtkSmartPointer<vtkCamera>::New();
+    axialSliceCamera->SetPosition(0, -60, 0);
+    axialSliceCamera->SetFocalPoint(center);
+
+    // Center camera on image volume.
+    vtkSmartPointer<vtkCamera> coronalSliceCamera =
+        vtkSmartPointer<vtkCamera>::New();
+    coronalSliceCamera->SetPosition(-60, 0, 0);
+    coronalSliceCamera->SetFocalPoint(center);
+
 
     // Divide the main window into four separate sections.
     // The main section on the top shows the 3D image volume.
@@ -542,11 +561,11 @@ int main(int argc, char* argv[])
     // Add actors for each renderer window.
     vtkSmartPointer<vtkRenderer> volumeRenderer =
         vtkSmartPointer<vtkRenderer>::New();
-    volumeRenderer->SetActiveCamera(camera);
+    volumeRenderer->SetActiveCamera(imageVolumeCamera);
     volumeRenderer->SetViewport(volumeViewport);
 
     volumeRenderer->AddActor(imageVolumeActor);
-    volumeRenderer->SetBackground(.5, .5, .5); // Set background color.
+    volumeRenderer->SetBackground(.8, .8, .8); // Set background color.
     volumeRenderer->RemoveAllLights();
 
     
@@ -558,12 +577,14 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkRenderer> axialSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     axialSliceRenderer->SetViewport(axialViewport);
+    axialSliceRenderer->SetActiveCamera(axialSliceCamera);
     axialSliceRenderer->AddActor(axialClippedVolumeActor);
     axialSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
     vtkSmartPointer<vtkRenderer> coronalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     coronalSliceRenderer->SetViewport(coronalViewport);
+    coronalSliceRenderer->SetActiveCamera(coronalSliceCamera);
     coronalSliceRenderer->AddActor(coronalClippedVolumeActor);
     coronalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
@@ -571,6 +592,7 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkRenderer> sagittalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     sagittalSliceRenderer->SetViewport(sagittalViewport);
+    sagittalSliceRenderer->SetActiveCamera(sagittalSliceCamera);
     sagittalSliceRenderer->AddActor(sagittalClippedVolumeActor);
     sagittalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
