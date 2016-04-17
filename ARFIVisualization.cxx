@@ -393,7 +393,7 @@ int main(int argc, char* argv[])
     axialClipDataSet->SetClipFunction(axialClipPlane);
     coronalClipDataSet->SetClipFunction(coronalClipPlane);
 
-    /*
+    
  #if VTK_MAJOR_VERSION <= 5
     sagittalClipDataSet->SetInput(triangleFilter->GetOutput());
     axialClipDataSet->SetInput(triangleFilter->GetOutput());
@@ -406,7 +406,7 @@ int main(int argc, char* argv[])
     sagittalClipDataSet->Update();
     axialClipDataSet->Update();
     coronalClipDataSet->Update();
-    */
+    
 
     // Create mapper and actor for clipped image volume.
     vtkSmartPointer<vtkDataSetMapper> sagittalClippedVolumeMapper =
@@ -501,15 +501,15 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkRenderer> coronalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     coronalSliceRenderer->SetViewport(coronalViewport);
-    axialSliceRenderer->AddActor(coronalClippedVolumeActor);
+    coronalSliceRenderer->AddActor(coronalClippedVolumeActor);
     coronalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
 
     vtkSmartPointer<vtkRenderer> sagittalSliceRenderer =
         vtkSmartPointer<vtkRenderer>::New();
     sagittalSliceRenderer->SetViewport(sagittalViewport);
-    axialSliceRenderer->AddActor(sagittalClippedVolumeActor);
-    coronalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
+    sagittalSliceRenderer->AddActor(sagittalClippedVolumeActor);
+    sagittalSliceRenderer->SetBackground(.1, .2, .3); // Set background color.
 
 
     renderWindow->AddRenderer(axialSliceRenderer);
