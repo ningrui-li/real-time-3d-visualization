@@ -216,8 +216,28 @@ public:
 };
 vtkStandardNewMacro(KeyPressInteractorStyle);
 
-int main(int argc, char* argv[])
-{
+
+std::vector<std::string> readImages() {
+    /*
+    This function returns a list of image files names that are read in from
+    standard input.
+
+    OUTPUT:
+    imageFileNames - a list of image file names to be displayed.
+    */
+    std::vector<std::string> imageFileNames;
+
+    for (std::string imageFileName; std::getline(std::cin, imageFileName);)
+        imageFileNames.push_back(imageFileName);
+
+    std::cout << imageFileNames.size() << " files total." << std::endl;
+    std::cout << "Image file names:" << std::endl;
+
+    return imageFileNames;
+}
+
+
+vtkSmartPointer<vtkCleanPolyData> readAndOrientImagePlanes() {
     vtkSmartPointer<vtkJPEGReader> reader;
     vtkSmartPointer<vtkImageDataGeometryFilter> imageDataGeometryFilter;
 
@@ -235,13 +255,8 @@ int main(int argc, char* argv[])
     Read in each image, convert it to a vtkStructuredGrid, then rotate it by
     angleOffset degrees and append it to the rest of the read images.
     */
-    std::vector<std::string> imageFileNames;
-    for (std::string imageFileName; std::getline(std::cin, imageFileName);) {
-        imageFileNames.push_back(imageFileName);
-    }
+    std::vector<std::string> imageFileNames = readImages();
 
-    std::cout << imageFileNames.size() << " files total." << std::endl;
-    std::cout << "Image file names:" << std::endl;
 
     /*
     Compute amount (in degrees) to rotate each image plane by, so that the
@@ -255,7 +270,7 @@ int main(int argc, char* argv[])
     double angleOffset = 1.0; // Angle offset between image planes.
     double translateOffset = 20.0; // How far away the plane is from the center of the transducer.
 
-    
+
     for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
         imageRotationAngles.push_back(centerAngle + (int(i) - N / 2)*angleOffset);
         // If there are an even number of image planes, we shift all rotations
@@ -264,7 +279,7 @@ int main(int argc, char* argv[])
         if (imageFileNames.size() % 2 == 0)
             imageRotationAngles[i] += angleOffset / 2.0;
     }
-    
+
 
     // Apply computed rotation angles to each image plane.
     for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
@@ -321,17 +336,14 @@ int main(int argc, char* argv[])
     cleanFilter->SetInputConnection(appendPolyDataFilter->GetOutputPort());
     cleanFilter->Update();
 
-    // Convert vtkPolyData to vtkUnstructuredGrid using vtkAppendFilter.
-    vtkSmartPointer<vtkAppendFilter> appendFilter =
-        vtkSmartPointer<vtkAppendFilter>::New();
-#if VTK_MAJOR_VERSION <= 5
-    appendFilter->AddInput(sphereSource->GetOutput());
-#else
-    appendFilter->AddInputData(cleanFilter->GetOutput());
-#endif
-    appendFilter->Update();
+
+    return cleanFilter;
+}
 
 
+int main(int argc, char* argv[])
+{
+    vtkSmartPointer<vtkCleanPolyData> cleanFilter = readAndOrientImagePlanes();
     // Triangulate the image data.
     vtkSmartPointer<vtkDelaunay3D> delaunayFilter =
         vtkSmartPointer<vtkDelaunay3D>::New();
@@ -427,7 +439,7 @@ int main(int argc, char* argv[])
     // Apply vtkClipDataSet filter for interpolation.    
     vtkSmartPointer<vtkOutlineFilter> imageVolumeOutline =
         vtkSmartPointer<vtkOutlineFilter>::New();
-    imageVolumeOutline->SetInputConnection(appendFilter->GetOutputPort());
+    imageVolumeOutline->SetInputConnection(cleanFilter->GetOutputPort());
 
     
     // I have no idea how the PlaceWidget() function works. I placed the
@@ -542,8 +554,7 @@ int main(int argc, char* argv[])
     // Create mapper and actor for image volume outline.
     vtkSmartPointer<vtkDataSetMapper> imageVolumeMapper =
         vtkSmartPointer<vtkDataSetMapper>::New();
-    //imageVolumeMapper->SetInputConnection(imageVolumeOutline->GetOutputPort());
-    imageVolumeMapper->SetInputConnection(appendFilter->GetOutputPort());
+    imageVolumeMapper->SetInputConnection(imageVolumeOutline->GetOutputPort());
 
     vtkSmartPointer<vtkActor> imageVolumeActor =
         vtkSmartPointer<vtkActor>::New();
@@ -668,3 +679,5 @@ int main(int argc, char* argv[])
 
     return EXIT_SUCCESS;
 }
+
+
