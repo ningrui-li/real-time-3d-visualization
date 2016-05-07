@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 
+#include "ARFIVisualization.h"
+
 // Generally always include these
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
@@ -52,33 +54,7 @@
 #include <vtkCamera.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 
-// Variables holding plane position and orientation.
-double center[3];
-double* bounds;
-double width;
-double height;
-double length;
 
-// Define image plane widget
-vtkSmartPointer<vtkPlaneWidget> sagittalClipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
-vtkSmartPointer<vtkPlaneWidget> axialClipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
-vtkSmartPointer<vtkPlaneWidget> coronalClipPlaneWidget = vtkSmartPointer<vtkPlaneWidget>::New();
-
-bool updateSagittal = false;
-bool updateAxial = false;
-bool updateCoronal = false;
-
-vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-
-// Define clipping filter
-vtkSmartPointer<vtkPlane> sagittalClipPlane = vtkSmartPointer<vtkPlane>::New();
-vtkSmartPointer<vtkClipDataSet> sagittalClipDataSet = vtkSmartPointer<vtkClipDataSet>::New();
-
-vtkSmartPointer<vtkPlane> axialClipPlane = vtkSmartPointer<vtkPlane>::New();
-vtkSmartPointer<vtkClipDataSet> axialClipDataSet = vtkSmartPointer<vtkClipDataSet>::New();
-
-vtkSmartPointer<vtkPlane> coronalClipPlane = vtkSmartPointer<vtkPlane>::New();
-vtkSmartPointer<vtkClipDataSet> coronalClipDataSet = vtkSmartPointer<vtkClipDataSet>::New();
 
 
 // Define interaction style
@@ -217,217 +193,15 @@ public:
 vtkStandardNewMacro(KeyPressInteractorStyle);
 
 
-std::vector<std::string> readImages() {
-    /*
-    This function returns a list of image files names that are read in from
-    standard input.
-
-    OUTPUT:
-    imageFileNames - a list of image file names to be displayed.
-    */
-    std::vector<std::string> imageFileNames;
-
-    for (std::string imageFileName; std::getline(std::cin, imageFileName);)
-        imageFileNames.push_back(imageFileName);
-
-    std::cout << imageFileNames.size() << " files total." << std::endl;
-    std::cout << "Image file names:" << std::endl;
-
-    return imageFileNames;
-}
-
-
-vtkSmartPointer<vtkCleanPolyData> readAndOrientImagePlanes() {
-    vtkSmartPointer<vtkJPEGReader> reader;
-    vtkSmartPointer<vtkImageDataGeometryFilter> imageDataGeometryFilter;
-
-    vtkSmartPointer<vtkTransform> rotationTransform;
-    vtkSmartPointer<vtkTransform> translateTransform;
-    vtkSmartPointer<vtkTransformPolyDataFilter> rotationTransformFilter;
-    vtkSmartPointer<vtkTransformPolyDataFilter> translateTransformFilter;
-
-    vtkSmartPointer<vtkPolyData> myImageData;
-
-    vtkSmartPointer<vtkAppendPolyData> appendPolyDataFilter =
-        vtkSmartPointer<vtkAppendPolyData>::New();
-
-    /*
-    Read in each image, convert it to a vtkStructuredGrid, then rotate it by
-    angleOffset degrees and append it to the rest of the read images.
-    */
-    std::vector<std::string> imageFileNames = readImages();
-
-
-    /*
-    Compute amount (in degrees) to rotate each image plane by, so that the
-    image planes are centered around initialAngle degrees.
-    */
-    // Vector holding amount (in degrees) to rotate each image plane by.
-    std::vector<double> imageRotationAngles;
-
-    int N = imageFileNames.size(); // Number of image planes.
-    double centerAngle = 0.0; // Center image planes around this angle.
-    double angleOffset = 1.0; // Angle offset between image planes.
-    double translateOffset = 20.0; // How far away the plane is from the center of the transducer.
-
-
-    for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
-        imageRotationAngles.push_back(centerAngle + (int(i) - N / 2)*angleOffset);
-        // If there are an even number of image planes, we shift all rotations
-        // forward by half of angleOffset so that we are still centered on
-        // centerAngle.
-        if (imageFileNames.size() % 2 == 0)
-            imageRotationAngles[i] += angleOffset / 2.0;
-    }
-
-
-    // Apply computed rotation angles to each image plane.
-    for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
-        std::string imageFileName = imageFileNames[i];
-        std::cout << imageFileName << std::endl;
-
-        // Read in image data as vtkImageData.
-        reader = vtkSmartPointer<vtkJPEGReader>::New();
-        reader->SetFileName(imageFileName.c_str());
-
-
-        // Code for converting from 
-        // vtkImageData -> vtkPolyData -> vtkUnstructuredGrid.
-        imageDataGeometryFilter = vtkSmartPointer<vtkImageDataGeometryFilter>::New();
-        imageDataGeometryFilter->SetInputConnection(reader->GetOutputPort());
-        imageDataGeometryFilter->Update();
-
-        // Offset the image slightly by the transducer's radius.
-        translateTransform = vtkSmartPointer<vtkTransform>::New();
-        translateTransform->Translate(translateOffset, 0.0, 0.0);
-        std::cout << imageRotationAngles[i] << std::endl;
-
-
-        translateTransformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
-        translateTransformFilter->SetTransform(translateTransform);
-        translateTransformFilter->SetInputConnection(imageDataGeometryFilter->GetOutputPort());
-        translateTransformFilter->Update();
-
-        // Rotate the image.
-        rotationTransform = vtkSmartPointer<vtkTransform>::New();
-        rotationTransform->RotateWXYZ(imageRotationAngles[i], 0, 1, 0);
-
-        rotationTransformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
-        rotationTransformFilter->SetTransform(rotationTransform);
-        rotationTransformFilter->SetInputConnection(translateTransformFilter->GetOutputPort());
-        rotationTransformFilter->Update();
-
-        myImageData = vtkSmartPointer<vtkPolyData>::New();
-        myImageData->ShallowCopy(rotationTransformFilter->GetOutput());
-
-        // Consider skipping this step and just adding data to the appendFilter
-        // to more directly convert to vtkUnstructuredGrid data.
-#if VTK_MAJOR_VERSION <= 5
-        appendPolyDataFilter->AddInputConnection(myImageData->GetProducerPort());
-#else
-        appendPolyDataFilter->AddInputData(myImageData);
-#endif
-        appendPolyDataFilter->Update();
-    }
-
-    // Remove any duplicate points.
-    vtkSmartPointer<vtkCleanPolyData> cleanFilter =
-        vtkSmartPointer<vtkCleanPolyData>::New();
-    cleanFilter->SetInputConnection(appendPolyDataFilter->GetOutputPort());
-    cleanFilter->Update();
-
-
-    return cleanFilter;
-}
-
 
 int main(int argc, char* argv[])
 {
     vtkSmartPointer<vtkCleanPolyData> cleanFilter = readAndOrientImagePlanes();
-    // Triangulate the image data.
-    vtkSmartPointer<vtkDelaunay3D> delaunayFilter =
-        vtkSmartPointer<vtkDelaunay3D>::New();
-    #if VTK_MAJOR_VERSION <= 5
-    delaunayFilter->SetInput(triangleFilter);
-#else
-    delaunayFilter->SetInputConnection(cleanFilter->GetOutputPort());
-#endif
-    delaunayFilter->Update();
+
+    int numPoints[3] = { 30, 30, 30 };
+    vtkSmartPointer<vtkProbeFilter> probeFilter = generateImageVolume(cleanFilter, numPoints);
 
 
-    /*
-    Sample vtkUnstructuredGrid into a uniformly sampled vtkStructuredGrid.
-
-    1. Get x, y, z extents of the vtkUnstructuredGrid.
-    2. Determine what spacing to use in these dimensions. Based on this
-    spacing, create a grid of points for the vtkStructuredGrid.
-    3. Determine the value at each of these points using vtkProbeFilter
-    for interpolation.
-    */
-
-    // Step 1: Get x, y, z extents of the vtkUnstructuredGrid.
-
-    // Cast output of appendFilter to vtkUnstructuredGrid
-
-    bounds = cleanFilter->GetOutput()->GetBounds();
-    center[0] = (bounds[0] + bounds[1]) / 2.0;
-    center[1] = (bounds[2] + bounds[3]) / 2.0;
-    center[2] = (bounds[4] + bounds[5]) / 2.0;
-
-    std::cout << std::endl << "Bounds: " << std::endl;
-    std::cout << "x: (" << bounds[0] << ", " << bounds[1] << ")" << std::endl;
-    std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
-    std::cout << "z: (" << bounds[4] << ", " << bounds[5] << ")" << std::endl;
-    // Step 2: Use bounds to determine locations where we can sample the 
-    // vtkStructuredGrid.
-
-    // Determine spacing in each dimension based on bounds and grid size.
-    int numXPoints = 30;
-    int numYPoints = 30;
-    int numZPoints = 30;
-
-    double spacingX = (bounds[1] - bounds[0]) / (double)(numXPoints);
-    double spacingY = (bounds[3] - bounds[2]) / (double)(numYPoints);
-    double spacingZ = (bounds[5] - bounds[4]) / (double)(numZPoints);
-
-    std::cout << std::endl << "Spacings: " << std::endl;
-    std::cout << "x: " << spacingX << std::endl;
-    std::cout << "y: " << spacingY << std::endl;
-    std::cout << "z: " << spacingZ << std::endl;
-    
-    // Construct vtkStructuredGrid based on this example:
-    // http://www.vtk.org/Wiki/VTK/Examples/Cxx/StructuredGrid/StructuredGrid
-    vtkSmartPointer<vtkStructuredGrid> structuredGrid =
-    vtkSmartPointer<vtkStructuredGrid>::New();
-
-    vtkSmartPointer<vtkPoints> points =
-    vtkSmartPointer<vtkPoints>::New();
-
-    for (double k = bounds[4]; k < bounds[5]; k += spacingZ) {
-        for (double j = bounds[2]; j < bounds[3]; j += spacingY) {
-            for (double i = bounds[0]; i < bounds[1]; i += spacingX) {
-            points->InsertNextPoint(i, j, k);
-            }
-        }
-    }
-
-    structuredGrid->SetDimensions(numXPoints, numYPoints, numZPoints);
-    structuredGrid->SetPoints(points);
-
-
-    // 3. Interpolate on the given vtkUnstructuredGrid images to compute
-    // the correct value to assign each of the vtkStructuredGrid points.
-    vtkSmartPointer<vtkProbeFilter> probeFilter =
-    vtkSmartPointer<vtkProbeFilter>::New();
-    probeFilter->SetSourceConnection(delaunayFilter->GetOutputPort());
-#if VTK_MAJOR_VERSION <= 5
-    probeFilter->SetInput(structuredGrid); // Interpolate 'Source' at these points
-#else
-    probeFilter->SetInputData(structuredGrid); // Interpolate 'Source' at these points
-#endif
-    probeFilter->Update();
-    std::cout << probeFilter->GetOutput() << std::endl;
-    
 
     // Triangulate structured grid before clipping.
     vtkSmartPointer<vtkDataSetTriangleFilter> triangleFilter =
@@ -678,6 +452,212 @@ int main(int argc, char* argv[])
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
+}
+
+
+std::vector<std::string> readImages() {
+    /*
+    This function returns a list of image files names that are read in from
+    standard input.
+
+    OUTPUT:
+    imageFileNames - a list of image file names to be displayed.
+    */
+    std::vector<std::string> imageFileNames;
+
+    for (std::string imageFileName; std::getline(std::cin, imageFileName);)
+        imageFileNames.push_back(imageFileName);
+
+    std::cout << imageFileNames.size() << " files total." << std::endl;
+    std::cout << "Image file names:" << std::endl;
+
+    return imageFileNames;
+}
+
+
+vtkSmartPointer<vtkCleanPolyData> readAndOrientImagePlanes() {
+    vtkSmartPointer<vtkJPEGReader> reader;
+    vtkSmartPointer<vtkImageDataGeometryFilter> imageDataGeometryFilter;
+
+    vtkSmartPointer<vtkTransform> rotationTransform;
+    vtkSmartPointer<vtkTransform> translateTransform;
+    vtkSmartPointer<vtkTransformPolyDataFilter> rotationTransformFilter;
+    vtkSmartPointer<vtkTransformPolyDataFilter> translateTransformFilter;
+
+    vtkSmartPointer<vtkPolyData> myImageData;
+
+    vtkSmartPointer<vtkAppendPolyData> appendPolyDataFilter =
+        vtkSmartPointer<vtkAppendPolyData>::New();
+
+    /*
+    Read in each image, convert it to a vtkStructuredGrid, then rotate it by
+    angleOffset degrees and append it to the rest of the read images.
+    */
+    std::vector<std::string> imageFileNames = readImages();
+
+
+    /*
+    Compute amount (in degrees) to rotate each image plane by, so that the
+    image planes are centered around initialAngle degrees.
+    */
+    // Vector holding amount (in degrees) to rotate each image plane by.
+    std::vector<double> imageRotationAngles;
+
+    int N = imageFileNames.size(); // Number of image planes.
+    double centerAngle = 0.0; // Center image planes around this angle.
+    double angleOffset = 1.0; // Angle offset between image planes.
+    double translateOffset = 20.0; // How far away the plane is from the center of the transducer.
+
+
+    for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
+        imageRotationAngles.push_back(centerAngle + (int(i) - N / 2)*angleOffset);
+        // If there are an even number of image planes, we shift all rotations
+        // forward by half of angleOffset so that we are still centered on
+        // centerAngle.
+        if (imageFileNames.size() % 2 == 0)
+            imageRotationAngles[i] += angleOffset / 2.0;
+    }
+
+
+    // Apply computed rotation angles to each image plane.
+    for (std::vector<std::string>::size_type i = 0; i < imageFileNames.size(); i++) {
+        std::string imageFileName = imageFileNames[i];
+        std::cout << imageFileName << std::endl;
+
+        // Read in image data as vtkImageData.
+        reader = vtkSmartPointer<vtkJPEGReader>::New();
+        reader->SetFileName(imageFileName.c_str());
+
+
+        // Code for converting from 
+        // vtkImageData -> vtkPolyData -> vtkUnstructuredGrid.
+        imageDataGeometryFilter = vtkSmartPointer<vtkImageDataGeometryFilter>::New();
+        imageDataGeometryFilter->SetInputConnection(reader->GetOutputPort());
+        imageDataGeometryFilter->Update();
+
+        // Offset the image slightly by the transducer's radius.
+        translateTransform = vtkSmartPointer<vtkTransform>::New();
+        translateTransform->Translate(translateOffset, 0.0, 0.0);
+        std::cout << imageRotationAngles[i] << std::endl;
+
+
+        translateTransformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+        translateTransformFilter->SetTransform(translateTransform);
+        translateTransformFilter->SetInputConnection(imageDataGeometryFilter->GetOutputPort());
+        translateTransformFilter->Update();
+
+        // Rotate the image.
+        rotationTransform = vtkSmartPointer<vtkTransform>::New();
+        rotationTransform->RotateWXYZ(imageRotationAngles[i], 0, 1, 0);
+
+        rotationTransformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+        rotationTransformFilter->SetTransform(rotationTransform);
+        rotationTransformFilter->SetInputConnection(translateTransformFilter->GetOutputPort());
+        rotationTransformFilter->Update();
+
+        myImageData = vtkSmartPointer<vtkPolyData>::New();
+        myImageData->ShallowCopy(rotationTransformFilter->GetOutput());
+
+        // Consider skipping this step and just adding data to the appendFilter
+        // to more directly convert to vtkUnstructuredGrid data.
+#if VTK_MAJOR_VERSION <= 5
+        appendPolyDataFilter->AddInputConnection(myImageData->GetProducerPort());
+#else
+        appendPolyDataFilter->AddInputData(myImageData);
+#endif
+        appendPolyDataFilter->Update();
+    }
+
+    // Remove any duplicate points.
+    vtkSmartPointer<vtkCleanPolyData> cleanFilter =
+        vtkSmartPointer<vtkCleanPolyData>::New();
+    cleanFilter->SetInputConnection(appendPolyDataFilter->GetOutputPort());
+    cleanFilter->Update();
+
+
+    return cleanFilter;
+}
+
+
+vtkSmartPointer<vtkProbeFilter> generateImageVolume(vtkSmartPointer<vtkCleanPolyData> cleanFilter, int numPoints[3]) {
+
+    // Triangulate the image data.
+    vtkSmartPointer<vtkDelaunay3D> delaunayFilter =
+        vtkSmartPointer<vtkDelaunay3D>::New();
+#if VTK_MAJOR_VERSION <= 5
+    delaunayFilter->SetInput(triangleFilter);
+#else
+    delaunayFilter->SetInputConnection(cleanFilter->GetOutputPort());
+#endif
+    delaunayFilter->Update();
+
+
+    /*
+    Sample vtkUnstructuredGrid into a uniformly sampled vtkStructuredGrid.
+
+    1. Get x, y, z extents of the vtkUnstructuredGrid.
+    2. Determine what spacing to use in these dimensions. Based on this
+    spacing, create a grid of points for the vtkStructuredGrid.
+    3. Determine the value at each of these points using vtkProbeFilter
+    for interpolation.
+    */
+
+    // Step 1: Get x, y, z extents of the vtkUnstructuredGrid.
+
+    bounds = cleanFilter->GetOutput()->GetBounds();
+    center[0] = (bounds[0] + bounds[1]) / 2.0;
+    center[1] = (bounds[2] + bounds[3]) / 2.0;
+    center[2] = (bounds[4] + bounds[5]) / 2.0;
+
+    std::cout << std::endl << "Bounds: " << std::endl;
+    std::cout << "x: (" << bounds[0] << ", " << bounds[1] << ")" << std::endl;
+    std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
+    std::cout << "z: (" << bounds[4] << ", " << bounds[5] << ")" << std::endl;
+    // Step 2: Use bounds to determine locations where we can sample the 
+    // vtkStructuredGrid.
+
+    // Determine spacing in each dimension based on bounds and grid size.
+    double spacingX = (bounds[1] - bounds[0]) / (double)(numPoints[0]);
+    double spacingY = (bounds[3] - bounds[2]) / (double)(numPoints[1]);
+    double spacingZ = (bounds[5] - bounds[4]) / (double)(numPoints[2]);
+
+    std::cout << std::endl << "Spacings: " << std::endl;
+    std::cout << "x: " << spacingX << std::endl;
+    std::cout << "y: " << spacingY << std::endl;
+    std::cout << "z: " << spacingZ << std::endl;
+
+    // Construct vtkStructuredGrid based on this example:
+    // http://www.vtk.org/Wiki/VTK/Examples/Cxx/StructuredGrid/StructuredGrid
+    vtkSmartPointer<vtkStructuredGrid> structuredGrid =
+        vtkSmartPointer<vtkStructuredGrid>::New();
+
+    vtkSmartPointer<vtkPoints> points =
+        vtkSmartPointer<vtkPoints>::New();
+
+    for (double k = bounds[4]; k < bounds[5]; k += spacingZ) {
+        for (double j = bounds[2]; j < bounds[3]; j += spacingY) {
+            for (double i = bounds[0]; i < bounds[1]; i += spacingX) {
+                points->InsertNextPoint(i, j, k);
+            }
+        }
+    }
+
+    structuredGrid->SetDimensions(numPoints);
+    structuredGrid->SetPoints(points);
+
+    // 3. Interpolate on the given vtkUnstructuredGrid images to compute
+    // the correct value to assign each of the vtkStructuredGrid points.
+    vtkSmartPointer<vtkProbeFilter> probeFilter =
+        vtkSmartPointer<vtkProbeFilter>::New();
+    probeFilter->SetSourceConnection(delaunayFilter->GetOutputPort());
+#if VTK_MAJOR_VERSION <= 5
+    probeFilter->SetInput(structuredGrid); // Interpolate 'Source' at these points
+#else
+    probeFilter->SetInputData(structuredGrid); // Interpolate 'Source' at these points
+#endif
+    probeFilter->Update();
+
+    return probeFilter;
 }
 
 
