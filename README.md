@@ -36,6 +36,8 @@ Compile Project
 
 * Visual Studio
 
+  * Try to use the latest version of Visual Studio. I was able to build this on a laptop running Windows 10 using [Visual Studio Community 2015](https://www.visualstudio.com/en-us/visual-studio-homepage-vs.aspx).
+
   * Setup cmake using some of the config options noted above to build VTK.
   
   * Make sure to link to your build VTK directory.
