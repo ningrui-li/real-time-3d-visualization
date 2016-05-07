@@ -196,11 +196,20 @@ vtkStandardNewMacro(KeyPressInteractorStyle);
 
 int main(int argc, char* argv[])
 {
+    // Read in all image files from standard input and apply rotation transforms
+    // to align them in space.
     vtkSmartPointer<vtkCleanPolyData> cleanFilter = readAndOrientImagePlanes();
 
+    // 
+    vtkSmartPointer<vtkOutlineFilter> imageVolumeOutline =
+        vtkSmartPointer<vtkOutlineFilter>::New();
+    imageVolumeOutline->SetInputConnection(cleanFilter->GetOutputPort());
+
+
+    // Take the aligned image planes and define a uniformly spaced grid of points
+    // to interpolate these image planes onto an image volume.
     int numPoints[3] = { 30, 30, 30 };
     vtkSmartPointer<vtkProbeFilter> probeFilter = generateImageVolume(cleanFilter, numPoints);
-
 
 
     // Triangulate structured grid before clipping.
@@ -211,13 +220,6 @@ int main(int argc, char* argv[])
     
 
     // Apply vtkClipDataSet filter for interpolation.    
-    vtkSmartPointer<vtkOutlineFilter> imageVolumeOutline =
-        vtkSmartPointer<vtkOutlineFilter>::New();
-    imageVolumeOutline->SetInputConnection(cleanFilter->GetOutputPort());
-
-    
-    // I have no idea how the PlaceWidget() function works. I placed the
-    // planes using the guess-and-check method.
     height = bounds[5] - bounds[4];
     width = bounds[3] - bounds[2];
     length = bounds[1] - bounds[0];
@@ -261,7 +263,6 @@ int main(int argc, char* argv[])
 
     coronalClipPlane->SetOrigin(0.0, 0.0, 0.0);
     coronalClipPlane->SetNormal(1.0, 0.0, 0.0);
-
 
     
  #if VTK_MAJOR_VERSION <= 5
@@ -579,32 +580,12 @@ vtkSmartPointer<vtkCleanPolyData> readAndOrientImagePlanes() {
 }
 
 
-vtkSmartPointer<vtkProbeFilter> generateImageVolume(vtkSmartPointer<vtkCleanPolyData> cleanFilter, int numPoints[3]) {
-
-    // Triangulate the image data.
-    vtkSmartPointer<vtkDelaunay3D> delaunayFilter =
-        vtkSmartPointer<vtkDelaunay3D>::New();
-#if VTK_MAJOR_VERSION <= 5
-    delaunayFilter->SetInput(triangleFilter);
-#else
-    delaunayFilter->SetInputConnection(cleanFilter->GetOutputPort());
-#endif
-    delaunayFilter->Update();
-
-
+vtkSmartPointer<vtkStructuredGrid> createStructuredGrid(double bounds[3], int numPoints[3]) {
     /*
-    Sample vtkUnstructuredGrid into a uniformly sampled vtkStructuredGrid.
-
-    1. Get x, y, z extents of the vtkUnstructuredGrid.
-    2. Determine what spacing to use in these dimensions. Based on this
-    spacing, create a grid of points for the vtkStructuredGrid.
-    3. Determine the value at each of these points using vtkProbeFilter
-    for interpolation.
+    This function defines a structured grid of points with the bounds (in x, y, and z) defined
+    by the angularly offset image planes. The resolution of the structured grid can be set
+    by changing the number of points of the grid (numPoints) in each dimension.
     */
-
-    // Step 1: Get x, y, z extents of the vtkUnstructuredGrid.
-
-    bounds = cleanFilter->GetOutput()->GetBounds();
     center[0] = (bounds[0] + bounds[1]) / 2.0;
     center[1] = (bounds[2] + bounds[3]) / 2.0;
     center[2] = (bounds[4] + bounds[5]) / 2.0;
@@ -613,8 +594,6 @@ vtkSmartPointer<vtkProbeFilter> generateImageVolume(vtkSmartPointer<vtkCleanPoly
     std::cout << "x: (" << bounds[0] << ", " << bounds[1] << ")" << std::endl;
     std::cout << "y: (" << bounds[2] << ", " << bounds[3] << ")" << std::endl;
     std::cout << "z: (" << bounds[4] << ", " << bounds[5] << ")" << std::endl;
-    // Step 2: Use bounds to determine locations where we can sample the 
-    // vtkStructuredGrid.
 
     // Determine spacing in each dimension based on bounds and grid size.
     double spacingX = (bounds[1] - bounds[0]) / (double)(numPoints[0]);
@@ -634,19 +613,52 @@ vtkSmartPointer<vtkProbeFilter> generateImageVolume(vtkSmartPointer<vtkCleanPoly
     vtkSmartPointer<vtkPoints> points =
         vtkSmartPointer<vtkPoints>::New();
 
-    for (double k = bounds[4]; k < bounds[5]; k += spacingZ) {
-        for (double j = bounds[2]; j < bounds[3]; j += spacingY) {
-            for (double i = bounds[0]; i < bounds[1]; i += spacingX) {
+    for (double k = bounds[4]; k < bounds[5]; k += spacingZ) 
+        for (double j = bounds[2]; j < bounds[3]; j += spacingY) 
+            for (double i = bounds[0]; i < bounds[1]; i += spacingX) 
                 points->InsertNextPoint(i, j, k);
-            }
-        }
-    }
-
+          
     structuredGrid->SetDimensions(numPoints);
     structuredGrid->SetPoints(points);
 
-    // 3. Interpolate on the given vtkUnstructuredGrid images to compute
-    // the correct value to assign each of the vtkStructuredGrid points.
+    return structuredGrid;
+}
+
+
+vtkSmartPointer<vtkProbeFilter> generateImageVolume(vtkSmartPointer<vtkCleanPolyData> cleanFilter, int numPoints[3]) {
+    /*
+    Sample vtkUnstructuredGrid into a uniformly sampled vtkStructuredGrid.
+
+    1. Get x, y, z extents of the vtkUnstructuredGrid.
+    2. Determine what spacing to use in these dimensions. Based on this
+    spacing, create a grid of points for the vtkStructuredGrid.
+    3. Determine the value at each of these points using vtkProbeFilter
+    for interpolation.
+    */
+
+
+    // Triangulate the image data.
+    vtkSmartPointer<vtkDelaunay3D> delaunayFilter =
+        vtkSmartPointer<vtkDelaunay3D>::New();
+#if VTK_MAJOR_VERSION <= 5
+    delaunayFilter->SetInput(triangleFilter);
+#else
+    delaunayFilter->SetInputConnection(cleanFilter->GetOutputPort());
+#endif
+    delaunayFilter->Update();
+
+
+
+    // Step 1: Get x, y, z extents of the vtkUnstructuredGrid.
+    bounds = cleanFilter->GetOutput()->GetBounds();
+
+    // Step 2: Use bounds to determine locations where we can sample the 
+    // vtkStructuredGrid. Define the structured grid based on these bounds
+    // as well as given set of points in each dimension.
+    vtkSmartPointer<vtkStructuredGrid> structuredGrid = createStructuredGrid(bounds, numPoints);
+
+    // Step 3: For each of the structured grid points, obtain its value by
+    // interpolating on the given vtkUnstructuredGrid images using the vtkProbeFilter.
     vtkSmartPointer<vtkProbeFilter> probeFilter =
         vtkSmartPointer<vtkProbeFilter>::New();
     probeFilter->SetSourceConnection(delaunayFilter->GetOutputPort());
@@ -659,5 +671,3 @@ vtkSmartPointer<vtkProbeFilter> generateImageVolume(vtkSmartPointer<vtkCleanPoly
 
     return probeFilter;
 }
-
-

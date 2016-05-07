@@ -79,5 +79,6 @@ vtkSmartPointer<vtkClipDataSet> coronalClipDataSet = vtkSmartPointer<vtkClipData
 
 
 vtkSmartPointer<vtkCleanPolyData> readAndOrientImagePlanes();
+vtkSmartPointer<vtkStructuredGrid> createStructuredGrid(double bounds[3], int numPoints[3]);
 vtkSmartPointer<vtkProbeFilter> generateImageVolume(vtkSmartPointer<vtkCleanPolyData> cleanFilter, int numPoints[3]);
 std::vector<std::string> readImages();
