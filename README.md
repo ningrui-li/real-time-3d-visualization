@@ -45,6 +45,8 @@ Compile Project
   * Use Release and BUILD_ALL in VS.
   
   * Make sure that your PATH environmental variable points to your VTK DLLS (e.g., ``C:\VTK\bin\Release``)
+  
+  * If you are still having trouble getting to this work, here are [some more detailed instructions](http://www.vtk.org/Wiki/VTK/Building/Windows) for building on Windows. Note that they are probably using a different version of Visual Studio than you are, but the steps should still be about the same.
 
 Running the ARFIVisualiation
 ----------------------------
