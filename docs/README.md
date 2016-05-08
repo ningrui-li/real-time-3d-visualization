@@ -22,7 +22,9 @@ The next step is to define a `vtkStructuredGrid`, which is a uniformly spaced gr
 There are several ways to perform the interpolation. It is currently done using the `vtkProbeFilter`, but the `vtkPointInterpolator` or the `vtkFlyingEdgesPlaneCutter` might be faster options to consider in the future, according to Matt McCormick. More information on how to use the `vtkProbeFilter` can be found [here](http://www.vtk.org/Wiki/Demystifying_the_vtkProbeFilter). The interpolation is performed in the function `generateImageVolume()`. 
 
 
-
+Selecting Slice Planes and User Interaction
+-------------------------------------------
+The user is able to translate three independent slice planes (`vtkPlaneWidget`) that are located in the sagittal, axial, and coronal orientations. The planes can be translated using the (`up`, `down`), (`left`, `right`), and (`a`, `z`) keys. Pressing `space` will re-slice the image volume based on the newly positioned slice planes. 
 
 
 
